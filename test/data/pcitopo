@@ -1,0 +1,11 @@
+#! /bin/bash
+# this is a stub for pcitopo command of multi-aiu-dev
+
+cd $(dirname ${0})
+if [ "$1" != "-j" ]; then
+	echo 'error: this stub only supports "pcitopo -j output.json" pattern.'
+	exit 1
+fi
+
+output=$2
+cp ../data/topo.json ${output}

@@ -1,0 +1,8 @@
+##############################################################
+#
+# List of approvers/reviewers
+#
+##############################################################
+
+# All files in workflows folder must be approved by listed active maintainers.
+.github/workflows/* @ibm-aiu/aiu-operator-owners

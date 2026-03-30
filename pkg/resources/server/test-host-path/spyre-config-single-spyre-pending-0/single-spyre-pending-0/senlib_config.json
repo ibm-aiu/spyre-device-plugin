@@ -1,0 +1,13 @@
+{
+    "GENERAL": {
+        "target": "SOC",
+        "sen_bus_id": ["00:01"]
+    },
+    "METRICS": {
+        "general": {
+            "enable": false,
+            "path": "metrics.%BUSID",
+            "port": 8000
+        }
+    }
+}
