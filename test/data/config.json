@@ -1,0 +1,18 @@
+{
+  "resourceList": [
+    {
+      "resourceName": "spyre_pf",
+      "selectors": {
+        "vendors": [
+          "1014"
+        ],
+        "devices": [
+          "06a7"
+        ],
+        "drivers": [
+          "vfio-pci"
+        ]
+      }
+    }
+  ]
+}

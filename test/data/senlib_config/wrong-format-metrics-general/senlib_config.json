@@ -1,0 +1,9 @@
+{
+    "GENERAL": {
+        "target": "SOC",
+        "sen_bus_id": []
+    },
+    "METRICS": {
+        "general": ""
+    }
+}

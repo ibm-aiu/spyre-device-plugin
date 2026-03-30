@@ -1,0 +1,32 @@
+{
+  "resourceList": [
+    {
+      "resourceName": "spyre_pf",
+      "selectors": {
+        "vendors": [
+          "1014"
+        ],
+        "devices": [
+          "06a7"
+        ],
+        "drivers": [
+          "vfio-pci"
+        ]
+      }
+    },
+    {
+      "resourceName": "spyre_vf",
+      "selectors": {
+        "vendors": [
+          "1014"
+        ],
+        "devices": [
+          "06a8"
+        ],
+        "drivers": [
+          "vfio-pci"
+        ]
+      }
+    }
+  ]
+}

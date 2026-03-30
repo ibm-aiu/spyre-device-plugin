@@ -1,0 +1,13 @@
+{
+    "GENERAL": {
+        "target": "SOC",
+        "doom": false,
+        "sen_bus_id": []
+    },
+    "METRICS": {
+        "general": {
+            "enable": true,
+            "port": 8000
+        }
+    }
+}

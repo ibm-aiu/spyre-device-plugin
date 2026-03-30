@@ -1,0 +1,48 @@
+run:
+  timeout: 10m
+  allow-parallel-runners: true
+
+issues:
+  # don't exclude the default set of lint
+  exclude-use-default: false
+  exclude-rules:
+  - path: (.+)_test\.go
+    linters:
+    - lll
+    - errcheck
+    - goconst
+
+  - path: "api/*"
+    linters:
+    - lll
+  - path: "cmd/*"
+    linters:
+    - lll
+
+linters:
+  disable-all: false
+  enable:
+  - dupl
+  - errcheck
+  - copyloopvar
+  - goconst
+  - gocyclo
+  - gofmt
+  - goimports
+  - gosimple
+  - govet
+  - ineffassign
+  - lll
+  - misspell
+  - nakedret
+  - prealloc
+  - staticcheck
+  - typecheck
+  - unconvert
+  - unparam
+  - unused
+  - gocritic
+
+linters-settings:
+  lll:
+    line-length: 140
