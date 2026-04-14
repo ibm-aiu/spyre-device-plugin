@@ -8,16 +8,6 @@ name: Source Code Test
 on:
   workflow_dispatch:
   push:
-    branches:
-    - main
-    paths:
-    - cmd/**
-    - pkg/**
-    - test/**
-    - go.mod
-    - go.sum
-    - Makefile
-    - images/**
 
 permissions: read-all
 

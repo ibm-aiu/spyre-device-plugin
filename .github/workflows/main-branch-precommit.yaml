@@ -8,8 +8,6 @@ name: Ensure Pre-commit
 on:
   workflow_dispatch:
   push:
-    branches:
-    - main
 
 permissions: read-all
 
