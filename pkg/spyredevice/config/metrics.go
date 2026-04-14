@@ -67,12 +67,12 @@ func IsMetricsMnt(containerMntPath, hostMntPath string) bool {
 
 func WritePodInfo(mntHostPaths []string, pod corev1.Pod) error {
 	for _, hostMntPath := range mntHostPaths {
-		if strings.Contains(hostMntPath, SpyreMetricBaseFolderName) {
+		if strings.Contains(hostMntPath, SpyreConfigBaseFolderName) {
 			if err := writeInfoFiles(hostMntPath, pod); err != nil {
 				return fmt.Errorf("error writing pod info to %s: %v", hostMntPath, err)
 			}
 			return nil
 		}
 	}
-	return fmt.Errorf("%s not found in %v", SpyreMetricBaseFolderName, mntHostPaths)
+	return nil
 }

@@ -61,27 +61,40 @@ var _ = Describe("Config", func() {
 		topology.MetadataTopologyFilepath = originalMetadataPath
 	})
 
-	It("get correct mount for config and metric with copied topology file", func() {
+	It("get correct config mount with copied topology file when metrics is disabled", func() {
 		mnts, err := Handler.GetConfigMetricsMount("spyre_pf_tier0", PseudoBusIds)
 		Expect(err).To(BeNil())
-		Expect(len(mnts)).To(Equal(2))
+		Expect(len(mnts)).To(Equal(1))
 		checkParentHostPath(mnts[0].HostPath, TestConfigHostPath)
 		Expect(mnts[0].ContainerPath).To(BeEquivalentTo(ConfigContainerPath))
 		outputFile := filepath.Join(mnts[0].HostPath, "topo.json")
 		_, err = os.Stat(outputFile)
 		Expect(err).To(BeNil())
-		checkParentHostPath(mnts[1].HostPath, TestMetricsHostPath)
-		Expect(mnts[1].ContainerPath).To(BeEquivalentTo(MetricsContainerPath))
 	})
 
 	It("skip copying topology file when requesting spyre_pf", func() {
 		mnts, err := Handler.GetConfigMetricsMount("spyre_pf", PseudoBusIds)
 		Expect(err).To(BeNil())
-		Expect(len(mnts)).To(Equal(2))
+		Expect(len(mnts)).To(Equal(1))
 		checkParentHostPath(mnts[0].HostPath, TestConfigHostPath)
 		outputFile := filepath.Join(mnts[0].HostPath, "topo.json")
 		_, err = os.Stat(outputFile)
 		Expect(os.IsNotExist(err)).To(BeTrue())
+	})
+
+	It("get correct config and metrics mounts when metrics is enabled", func() {
+		os.Setenv(TemplatePathKey, "../../../test/data/senlib_config/enable")
+		var err error
+		Handler, err = InitConfigMount()
+		Expect(err).To(BeNil())
+
+		mnts, err := Handler.GetConfigMetricsMount("spyre_pf", PseudoBusIds)
+		Expect(err).To(BeNil())
+		Expect(len(mnts)).To(Equal(2))
+		checkParentHostPath(mnts[0].HostPath, TestConfigHostPath)
+		Expect(mnts[0].ContainerPath).To(BeEquivalentTo(ConfigContainerPath))
+		checkParentHostPath(mnts[1].HostPath, TestMetricsHostPath)
+		Expect(mnts[1].ContainerPath).To(BeEquivalentTo(MetricsContainerPath))
 	})
 })
 

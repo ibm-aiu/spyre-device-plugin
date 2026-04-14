@@ -100,7 +100,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).To(BeNil())
 	err = utils.CreateFolderIfNotExists(TestMetricsHostPath)
 	Expect(err).To(BeNil())
-	senlibConfigGnerator = spyreconf.NewSenlibConfigGenerator()
+	senlibConfigGnerator, err = spyreconf.NewSenlibConfigGenerator()
+	Expect(err).To(BeNil())
 
 	Expect(os.Getenv("KUBEBUILDER_ASSETS")).ShouldNot(Equal(""), "environment value \"KUBEBUILDER_ASSETS\" must be set.")
 

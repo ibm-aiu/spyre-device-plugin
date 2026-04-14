@@ -30,7 +30,8 @@ import (
 )
 
 const (
-	DeviceEnvKey = "PCIDEVICE_IBM_COM_AIU_PF"
+	DeviceEnvKey     = "PCIDEVICE_IBM_COM_AIU_PF"
+	MetricPathEnvKey = "SPYRE_METRIC_PATH"
 )
 
 // NewPciDevice returns an instance of PciDevice interface

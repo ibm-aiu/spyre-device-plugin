@@ -22,9 +22,68 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	. "k8s.io/cri-api/pkg/apis/runtime/v1"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
 	. "github.com/onsi/gomega"
 )
+
+// MockResourcePool is a mock implementation of types.ResourcePool for testing
+type MockResourcePool struct {
+	ResourceName   string
+	ResourcePrefix string
+	Devices        map[string]*pluginapi.Device
+	Envs           []string
+	Mounts         []*pluginapi.Mount
+	DeviceSpecs    []*pluginapi.DeviceSpec
+	TopologyAware  bool
+	SelfAllocation map[string]bool
+}
+
+func (m *MockResourcePool) GetResourceName() string {
+	if m.ResourceName == "" {
+		return "mock-resource"
+	}
+	return m.ResourceName
+}
+
+func (m *MockResourcePool) GetResourcePrefix() string {
+	if m.ResourcePrefix == "" {
+		return "mock-prefix"
+	}
+	return m.ResourcePrefix
+}
+
+func (m *MockResourcePool) GetDevices() map[string]*pluginapi.Device {
+	return m.Devices
+}
+
+func (m *MockResourcePool) Probe() bool {
+	return true
+}
+
+func (m *MockResourcePool) GetDeviceSpecs(deviceIDs []string) []*pluginapi.DeviceSpec {
+	return m.DeviceSpecs
+}
+
+func (m *MockResourcePool) GetEnvs(deviceIDs []string) []string {
+	return m.Envs
+}
+
+func (m *MockResourcePool) GetMounts(deviceIDs []string) []*pluginapi.Mount {
+	return m.Mounts
+}
+
+func (m *MockResourcePool) InformedBySharedInfo(deviceList []string, allocated bool, self bool) bool {
+	return false
+}
+
+func (m *MockResourcePool) IsTopologyAware() bool {
+	return m.TopologyAware
+}
+
+func (m *MockResourcePool) GetSelfAllocation() map[string]bool {
+	return m.SelfAllocation
+}
 
 const (
 	uuidGenerateMaxRetry = 10

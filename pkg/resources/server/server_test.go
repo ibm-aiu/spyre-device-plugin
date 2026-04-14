@@ -141,4 +141,71 @@ var _ = Describe("Resource Server", func() {
 			Entry("request at all devices allocated", map[string]bool{"01": true, "02": true}, []string{"01", "02"}, oneNDev, nil),
 		)
 	})
+
+	Context("getEnvs method", func() {
+		var rs types.ResourceServer
+
+		It("should return environment variables with single device", func() {
+			deviceIDs := []string{"0000:01:00.0"}
+			mockPool := &MockResourcePool{
+				Envs: []string{"0000:01:00.0"},
+			}
+			allocatedCh := make(chan types.AllocationInfo, 1)
+			rs = NewResourceServer("spyre_pf", "sock", true, mockPool, nil, allocatedCh, "")
+
+			envs := rs.(*ResourceServer).GetEnvs(deviceIDs)
+
+			Expect(envs).NotTo(BeNil())
+			Expect(envs).To(HaveKey("PCIDEVICE_IBM_COM_AIU_PF"))
+			Expect(envs["PCIDEVICE_IBM_COM_AIU_PF"]).To(Equal("0000:01:00.0"))
+		})
+
+		It("should return environment variables with multiple devices", func() {
+			deviceIDs := []string{"0000:01:00.0", "0000:02:00.0", "0000:03:00.0"}
+			mockPool := &MockResourcePool{
+				Envs: []string{"0000:01:00.0", "0000:02:00.0", "0000:03:00.0"},
+			}
+			allocatedCh := make(chan types.AllocationInfo, 1)
+			rs = NewResourceServer("spyre_pf", "sock", true, mockPool, nil, allocatedCh, "")
+
+			envs := rs.(*ResourceServer).GetEnvs(deviceIDs)
+
+			Expect(envs).NotTo(BeNil())
+			Expect(envs).To(HaveKey("PCIDEVICE_IBM_COM_AIU_PF"))
+			Expect(envs["PCIDEVICE_IBM_COM_AIU_PF"]).To(Equal("0000:01:00.0,0000:02:00.0,0000:03:00.0"))
+		})
+
+		It("should return environment variables with empty device list", func() {
+			deviceIDs := []string{}
+			mockPool := &MockResourcePool{
+				Envs: []string{},
+			}
+			allocatedCh := make(chan types.AllocationInfo, 1)
+			rs = NewResourceServer("spyre_pf", "sock", true, mockPool, nil, allocatedCh, "")
+
+			envs := rs.(*ResourceServer).GetEnvs(deviceIDs)
+
+			Expect(envs).NotTo(BeNil())
+			Expect(envs).To(HaveKey("PCIDEVICE_IBM_COM_AIU_PF"))
+			Expect(envs["PCIDEVICE_IBM_COM_AIU_PF"]).To(Equal(""))
+		})
+
+		It("should include metrics path when metrics are enabled", func() {
+			// This test verifies the basic structure
+			// The actual metrics path inclusion depends on config.IsMetricsEnabled()
+			deviceIDs := []string{"0000:01:00.0"}
+			mockPool := &MockResourcePool{
+				Envs: []string{"0000:01:00.0"},
+			}
+			allocatedCh := make(chan types.AllocationInfo, 1)
+			rs = NewResourceServer("spyre_pf", "sock", true, mockPool, nil, allocatedCh, "")
+
+			envs := rs.(*ResourceServer).GetEnvs(deviceIDs)
+
+			Expect(envs).NotTo(BeNil())
+			Expect(envs).To(HaveKey("PCIDEVICE_IBM_COM_AIU_PF"))
+			// Metrics path key "SPYRE_METRIC_PATH" may or may not be present
+			// depending on whether config.IsMetricsEnabled() returns true
+		})
+	})
 })

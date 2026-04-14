@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,15 +70,29 @@ type SenlibConfig struct {
 
 type SenlibConfigGenerator struct {
 	templateFilePath string
+	configMap        map[string]any
+	metricEnabled    bool
 }
 
-func NewSenlibConfigGenerator() SenlibConfigGenerator {
+func NewSenlibConfigGenerator() (SenlibConfigGenerator, error) {
 	templatePath := utils.GetEnvOrDefault(TemplatePathKey, defaultTemplatePath)
 	templateFilePath := fmt.Sprintf("%s/%s", templatePath, GetConfigFileName())
-
+	// Open the JSON file
+	var file []byte
+	var configMap map[string]any
+	file, err := os.ReadFile(templateFilePath)
+	if err != nil {
+		return SenlibConfigGenerator{}, fmt.Errorf("error opening file: %v", err)
+	}
+	err = json.Unmarshal(file, &configMap)
+	if err != nil {
+		return SenlibConfigGenerator{}, fmt.Errorf("error unmarshalling JSON: %v", err)
+	}
 	return SenlibConfigGenerator{
 		templateFilePath: templateFilePath,
-	}
+		configMap:        configMap,
+		metricEnabled:    isMetricsEnabled(configMap),
+	}, nil
 }
 
 /*
@@ -88,78 +103,65 @@ GenerateConfigContent generates config json file based on senlib config template
     2.2. Otherwise, set to metrics.%BUSID (default value)
 */
 func (g SenlibConfigGenerator) GenerateConfigContent(resourcePool string, busIds []string, metricsPath string) (content []byte, err error) {
-	// Open the JSON file
-	var file []byte
-	file, err = os.ReadFile(g.templateFilePath)
-	if err != nil {
-		return content, fmt.Errorf("error opening file: %v", err)
-	}
-
-	var configMap map[string]any
-
-	// Unmarshal the JSON data
-	if err = json.Unmarshal(file, &configMap); err == nil {
-		if generalConfigInterface, found := configMap[GeneralKey]; found {
-			if _, ok := generalConfigInterface.(map[string]any); ok {
-				// set .GENERAL fields
-				configMap[GeneralKey].(map[string]any)[BusIdKey] = busIds
-				switch {
-				case strings.Contains(resourcePool, "spyre_pf"):
-					configMap[GeneralKey].(map[string]any)["doom"] = false
-				default:
-					configMap[GeneralKey].(map[string]any)["doom"] = true
-				}
-				// set .METRICS.general by checking .METRICS.general.enable
-				if metricsConfigInterface, found := configMap[MetricsKey]; found {
-					var metricsConfig map[string]any
-					if metricsConfig, ok = metricsConfigInterface.(map[string]any); ok {
-						if metricsGeneralConfigInterface, found := metricsConfig[MetricGeneralKey]; found {
-							if metricGeneralConfig, ok := metricsGeneralConfigInterface.(map[string]any); ok {
-								if enableInterface, found := metricGeneralConfig[EnableKey]; found {
-									metricEnabled := false
-									if metricEnabled, ok = enableInterface.(bool); !ok {
-										metricEnabled = false
-									}
-									if metricEnabled {
-										configMap[MetricsKey].(map[string]any)[MetricGeneralKey].(map[string]any)[PathKey] = filepath.Join(metricsPath, WildCardLocalMetricPath) //nolint:lll
-									} else {
-										configMap[MetricsKey].(map[string]any)[MetricGeneralKey].(map[string]any)[PathKey] = WildCardLocalMetricPath //nolint:lll
-									}
+	configMap := maps.Clone(g.configMap)
+	if generalConfigInterface, found := configMap[GeneralKey]; found {
+		if _, ok := generalConfigInterface.(map[string]any); ok {
+			// set .GENERAL fields
+			configMap[GeneralKey].(map[string]any)[BusIdKey] = busIds
+			switch {
+			case strings.Contains(resourcePool, "spyre_pf"):
+				configMap[GeneralKey].(map[string]any)["doom"] = false
+			default:
+				configMap[GeneralKey].(map[string]any)["doom"] = true
+			}
+			// set .METRICS.general by checking .METRICS.general.enable
+			if metricsConfigInterface, found := configMap[MetricsKey]; found {
+				var metricsConfig map[string]any
+				if metricsConfig, ok = metricsConfigInterface.(map[string]any); ok {
+					if metricsGeneralConfigInterface, found := metricsConfig[MetricGeneralKey]; found {
+						if metricGeneralConfig, ok := metricsGeneralConfigInterface.(map[string]any); ok {
+							if enableInterface, found := metricGeneralConfig[EnableKey]; found {
+								metricEnabled := false
+								if metricEnabled, ok = enableInterface.(bool); !ok {
+									metricEnabled = false
 								}
-							} else {
-								err = fmt.Errorf("failed to parse METRICS.general: %v", metricsGeneralConfigInterface)
+								if metricEnabled {
+									configMap[MetricsKey].(map[string]any)[MetricGeneralKey].(map[string]any)[PathKey] = filepath.Join(metricsPath, WildCardLocalMetricPath) //nolint:lll
+								} else {
+									configMap[MetricsKey].(map[string]any)[MetricGeneralKey].(map[string]any)[PathKey] = WildCardLocalMetricPath //nolint:lll
+								}
 							}
 						} else {
-							// general key not found
-							configMap[MetricsKey].(map[string]any)[MetricGeneralKey] = map[string]any{
-								EnableKey: false,
-								PathKey:   WildCardLocalMetricPath,
-							}
+							err = fmt.Errorf("failed to parse METRICS.general: %v", metricsGeneralConfigInterface)
 						}
 					} else {
-						err = fmt.Errorf("failed to parse METRICS: %v", metricsConfigInterface)
-					}
-				} else {
-					// METRICS key not found
-					configMap[MetricsKey] = map[string]any{
-						MetricGeneralKey: map[string]any{
+						// general key not found
+						configMap[MetricsKey].(map[string]any)[MetricGeneralKey] = map[string]any{
 							EnableKey: false,
 							PathKey:   WildCardLocalMetricPath,
-						},
+						}
 					}
-				}
-				configMap = modifyRISCVContent(configMap, resourcePool)
-				if err == nil {
-					content, err = json.Marshal(configMap)
+				} else {
+					err = fmt.Errorf("failed to parse METRICS: %v", metricsConfigInterface)
 				}
 			} else {
-				err = fmt.Errorf("failed to parse GENERAL: %v", generalConfigInterface)
+				// METRICS key not found
+				configMap[MetricsKey] = map[string]any{
+					MetricGeneralKey: map[string]any{
+						EnableKey: false,
+						PathKey:   WildCardLocalMetricPath,
+					},
+				}
+			}
+			configMap = modifyRISCVContent(configMap, resourcePool)
+			if err == nil {
+				content, err = json.Marshal(configMap)
 			}
 		} else {
-			err = NoGeneralKeyErr
+			err = fmt.Errorf("failed to parse GENERAL: %v", generalConfigInterface)
 		}
 	} else {
-		err = fmt.Errorf("error unmarshalling JSON: %v", err)
+		err = NoGeneralKeyErr
 	}
 	return content, err
 }
@@ -220,6 +222,10 @@ func ReadResourcePool(mntPath string) (string, error) {
 	return string(data), err
 }
 
+func GetEnabledMetricPath() string {
+	return filepath.Join(GetMetricsContainerPath(), WildCardLocalMetricPath)
+}
+
 // modifyRISCVContent applies the following config if resourcePool doesn't contain spyre_vf (PF Mode).
 //
 //	{
@@ -248,4 +254,18 @@ func modifyRISCVContent(configMap map[string]any, resourcePool string) map[strin
 	}
 	configMap[SNTMCIKey].(map[string]any)[SNTMCIDCRKey].(map[string]any)[DCRMCICTRLKey].(map[string]any)[EnableRISCVKey] = "0x0" //nolint:lll
 	return configMap
+}
+
+// isMetricsEnabled reports whether METRICS.general.enable is true in the template file.
+func isMetricsEnabled(configMap map[string]any) bool {
+	metricsConfig, ok := configMap[MetricsKey].(map[string]any)
+	if !ok {
+		return false
+	}
+	metricGeneralConfig, ok := metricsConfig[MetricGeneralKey].(map[string]any)
+	if !ok {
+		return false
+	}
+	enabled, ok := metricGeneralConfig[EnableKey].(bool)
+	return ok && enabled
 }

@@ -68,8 +68,11 @@ func InitConfigMount() (*ConfigHandler, error) {
 	if err := InitMetricsMountPath(); err != nil {
 		return cfgHandler, err
 	}
-	senlibConfigGenerator = NewSenlibConfigGenerator()
-	err := utils.CreateFolderIfNotExists(configHostPath)
+	var err error
+	if senlibConfigGenerator, err = NewSenlibConfigGenerator(); err != nil {
+		return cfgHandler, err
+	}
+	err = utils.CreateFolderIfNotExists(configHostPath)
 	return cfgHandler, err
 }
 
@@ -91,6 +94,9 @@ func (h *ConfigHandler) GetConfigMetricsMount(resourcePool string,
 		return mnts, err
 	}
 	mnts = append(mnts, configMnt)
+	if !IsMetricsEnabled() {
+		return mnts, nil
+	}
 	metricsMnt, err := getMetricsMount(configMnt.HostPath)
 	if err == nil {
 		mnts = append(mnts, metricsMnt)
@@ -100,11 +106,8 @@ func (h *ConfigHandler) GetConfigMetricsMount(resourcePool string,
 	return mnts, err
 }
 
-// GetMountedPath returns mounted path for deviceIDs
-func (h *ConfigHandler) GetMountedPath(deviceIDs []string) (val string, ok bool) {
-	key := uniqueStringFromDeviceIDs(deviceIDs)
-	val, ok = h.uuidMap[key]
-	return val, ok
+func IsMetricsEnabled() bool {
+	return senlibConfigGenerator.metricEnabled
 }
 
 // Still outstanding: clean up folder after permanently delete device plugin pod. Might be called

@@ -456,6 +456,9 @@ func (rs *resourceServer) getEnvs(deviceIDs []string) map[string]string {
 		values += ","
 	}
 	envs[spyredevice.DeviceEnvKey] = values
+	if config.IsMetricsEnabled() {
+		envs[spyredevice.MetricPathEnvKey] = config.GetEnabledMetricPath()
+	}
 	return envs
 }
 

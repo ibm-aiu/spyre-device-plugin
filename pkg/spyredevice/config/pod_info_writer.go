@@ -17,11 +17,11 @@ const (
 	PodNamespaceFile = "POD_NAMESPACE"
 )
 
-func writeInfoFiles(metricsFolder string, pod corev1.Pod) error {
+func writeInfoFiles(configFolder string, pod corev1.Pod) error {
 	// write pod name
-	if err := utils.WriteFile(metricsFolder, PodNameFile, pod.Name); err != nil {
+	if err := utils.WriteFile(configFolder, PodNameFile, pod.Name); err != nil {
 		return err
 	}
 	// write pod namespace
-	return utils.WriteFile(metricsFolder, PodNamespaceFile, pod.Namespace)
+	return utils.WriteFile(configFolder, PodNamespaceFile, pod.Namespace)
 }

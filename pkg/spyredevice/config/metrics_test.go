@@ -35,18 +35,17 @@ var _ = Describe("Metrics", func() {
 		configHostPath := "config-host-path/some-uuid-value"
 		pod.Name = name
 		pod.Namespace = namespace
-		metricsFolder, err := utils.CreateNewMetricsFolder(TestMetricsHostPath, configHostPath)
+		err := utils.CreateFolderIfNotExists(configHostPath)
 		Expect(err).To(BeNil())
-		Expect(metricsFolder).To(Equal("metrics-host-path/some-uuid-value"))
-		err = WriteInfoFiles(metricsFolder, *pod)
+		err = WriteInfoFiles(configHostPath, *pod)
 		Expect(err).To(BeNil())
-		createdPodName, err := utils.ReadStringInFile(metricsFolder, PodNameFile)
+		createdPodName, err := utils.ReadStringInFile(configHostPath, PodNameFile)
 		Expect(err).To(BeNil())
 		Expect(createdPodName).To(Equal(name))
-		createdPodNamespace, err := utils.ReadStringInFile(metricsFolder, PodNamespaceFile)
+		createdPodNamespace, err := utils.ReadStringInFile(configHostPath, PodNamespaceFile)
 		Expect(err).To(BeNil())
 		Expect(createdPodNamespace).To(Equal(namespace))
-		err = os.RemoveAll(metricsFolder)
+		err = os.RemoveAll(configHostPath)
 		Expect(err).To(BeNil())
 	})
 })
