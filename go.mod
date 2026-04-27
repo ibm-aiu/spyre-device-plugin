@@ -14,7 +14,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	go.uber.org/zap v1.27.1
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
-	google.golang.org/grpc v1.79.3
+	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	k8s.io/api v0.32.9
 	k8s.io/apimachinery v0.32.9
