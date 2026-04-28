@@ -10,7 +10,7 @@ require (
 	github.com/ibm-aiu/spyre-operator v0.0.0-20260415001142-161550f6564c
 	github.com/jaypipes/ghw v0.13.0
 	github.com/jaypipes/pcidb v1.1.1
-	github.com/onsi/ginkgo/v2 v2.28.1
+	github.com/onsi/ginkgo/v2 v2.28.2
 	github.com/onsi/gomega v1.39.1
 	go.uber.org/zap v1.27.1
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
