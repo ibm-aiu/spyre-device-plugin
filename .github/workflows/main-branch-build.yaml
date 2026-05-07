@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build:
-    uses: modassarrana89-new/spyre-operator-actions/.github/workflows/build-image.yaml@multi-arch-build
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/build-image.yaml@main
     with:
       dockerfile: ./images/Dockerfile.ubi9
       pre_build_command: make vendor
