@@ -16,5 +16,5 @@ permissions:
   packages: write # Crucial for pushing to ghcr.io
 
 jobs:
-  build-amd64:
-    uses: ibm-aiu/spyre-operator-actions/.github/workflows/build-image.yaml@main
+  build:
+    uses: modassarrana89-new/spyre-operator-actions/.github/workflows/build-image.yaml@multi-arch-build
