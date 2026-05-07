@@ -18,3 +18,5 @@ permissions:
 jobs:
   build:
     uses: modassarrana89-new/spyre-operator-actions/.github/workflows/build-image.yaml@multi-arch-build
+    with:
+      dockerfile: ./images/Dockerfile.ubi9
