@@ -65,7 +65,6 @@ type CliParams struct {
 	ResourcePrefix   string
 	TopologyFilepath string
 	ProbePort        string
-	Insecure         bool
 }
 
 type ResourceManager struct {
@@ -571,12 +570,8 @@ func (rm *ResourceManager) StartSpyreNodeStateUpdateTicker(ctx context.Context, 
 		glog.Error("failed to patch allocation status", err)
 	}
 
-	if rm.Insecure {
-		glog.Warning("Health checker running in INSECURE mode: TLS disabled (default)")
-	} else {
-		glog.Info("Health checker running securely: TLS enabled")
-	}
-	checker := spyrehealth.GetHealthChecker(ScanInterval, rm.Insecure)
+	glog.Info("Health checker running with TLS enabled (mandatory)")
+	checker := spyrehealth.GetHealthChecker(ScanInterval)
 	if checker == nil {
 		glog.Info("No health checker, skip health checking")
 		return

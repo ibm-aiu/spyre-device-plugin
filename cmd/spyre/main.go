@@ -48,8 +48,6 @@ func flagInit(cp *manager.CliParams) {
 		"JSON device pool config file location")
 	flag.StringVar(&cp.ResourcePrefix, "resource-prefix", "ibm.com",
 		"resource name prefix used for K8s extended resource")
-	flag.BoolVar(&cp.Insecure, "insecure", true,
-		"disable TLS for health checker gRPC connection (default: true, insecure mode)")
 }
 
 func main() {

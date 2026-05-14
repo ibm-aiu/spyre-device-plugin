@@ -30,9 +30,9 @@ type HealthChecker interface {
 
 // GetHealthChecker returns SpyreHealthClient if socket exists,
 // otherwise return PciMonitor with given scanInterval.
-// If insecure is true, connects to health checker without TLS.
-func GetHealthChecker(scanInterval time.Duration, insecure bool) HealthChecker {
-	healthCheckerClient, err := NewSpyreHealthClient(insecure)
+// Always connects to health checker with TLS enabled.
+func GetHealthChecker(scanInterval time.Duration) HealthChecker {
+	healthCheckerClient, err := NewSpyreHealthClient()
 	if err == nil {
 		glog.Info("Use SpyreHealthClient health checker")
 		return healthCheckerClient
