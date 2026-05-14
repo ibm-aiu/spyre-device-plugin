@@ -36,21 +36,21 @@ var _ = Describe("HealthChecker", Serial, Ordered, func() {
 
 	Context("GetHealthChecker", func() {
 		It("can return expected nil", func() {
-			_, err := NewSpyreHealthClient(false)
+			_, err := NewSpyreHealthClient()
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(HavePrefix("failed to get spyrehealth socket"))
 			os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
-			checker := GetHealthChecker(DefaultScanInterval, false)
+			checker := GetHealthChecker(DefaultScanInterval)
 			Expect(checker).To(BeNil(), "should not get %v", checker)
 			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 		})
 		It("can get PciMonitor", func() {
-			_, err := NewSpyreHealthClient(false)
+			_, err := NewSpyreHealthClient()
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(HavePrefix("failed to get spyrehealth socket"))
 			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			customScanInterval := 99 * time.Second
-			checker := GetHealthChecker(customScanInterval, false)
+			checker := GetHealthChecker(customScanInterval)
 			pciMonitor, ok := checker.(*PCIMonitor)
 			Expect(ok).To(BeTrue(), "should not get %v", pciMonitor)
 			Expect(pciMonitor.ScanInterval).To(Equal(customScanInterval))
@@ -58,7 +58,7 @@ var _ = Describe("HealthChecker", Serial, Ordered, func() {
 		It("can get SpyreHealthClient", func() {
 			dummyServer := NewDummyServer()
 			defer dummyServer.Stop()
-			checker := GetHealthChecker(DefaultScanInterval, false)
+			checker := GetHealthChecker(DefaultScanInterval)
 			client, ok := checker.(*SpyreHealthClient)
 			Expect(ok).To(BeTrue(), "should not get %v", client)
 		})
