@@ -174,7 +174,7 @@ func (t *SpyreHealthClient) Register(ctx context.Context, updateChan chan struct
 	if err != nil {
 		return fmt.Errorf("failed to load TLS credentials: %w", err) // pragma: allowlist secret
 	}
-	glog.Info("Using TLS for spyre health client connection (mandatory)")
+	glog.Info("Using TLS for spyre health client connection")
 	dialOpts := []grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
 	}

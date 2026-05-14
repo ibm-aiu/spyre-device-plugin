@@ -570,7 +570,7 @@ func (rm *ResourceManager) StartSpyreNodeStateUpdateTicker(ctx context.Context, 
 		glog.Error("failed to patch allocation status", err)
 	}
 
-	glog.Info("Health checker running with TLS enabled (mandatory)")
+	glog.Info("Health checker running with TLS enabled")
 	checker := spyrehealth.GetHealthChecker(ScanInterval)
 	if checker == nil {
 		glog.Info("No health checker, skip health checking")
