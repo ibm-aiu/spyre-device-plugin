@@ -3,9 +3,12 @@
  # | SPDX-License-Identifier: Apache-2.0                               |
  # +-------------------------------------------------------------------+
 
+# Enable automatic Go toolchain management
+export GOTOOLCHAIN = auto
+
 GOLANG_VERSION		?= $(shell cd $(REPO_ROOT) && go list -f {{.GoVersion}} -m)
-BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:9.6-1745588370
-GOTOOLCHAIN			?= go1.24.13
+BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:$(GOLANG_VERSION)
+GOTOOLCHAIN			?= go$(GOLANG_VERSION)
 MAKEFILE_PATH		:= $(abspath $(lastword $(MAKEFILE_LIST)))
 REPO_ROOT 			:= $(abspath $(patsubst %/,%,$(dir $(MAKEFILE_PATH))))
 CURRENT_DIR			:= $(shell pwd)
@@ -58,6 +61,7 @@ CONTROLLER_GEN	?= $(LOCALBIN)/controller-gen
 CONTROLLER_TOOLS_VERSION 	?= v0.17.3
 ENVTEST_K8S_VERSION			?= 1.31
 GOLANGCI_LINT_VERSION		?= 1.64.8
+GOLANGCI_LINT_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
 GINKGO_VERSION				?= v2.28.1
 YQ_VERSION 					?= v4.29.2
 KIND_VERSION				?= 0.20.0
