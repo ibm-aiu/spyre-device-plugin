@@ -21,3 +21,4 @@ jobs:
     with:
       dockerfile: ./images/Dockerfile.ubi9
       pre_build_command: make vendor
+      image_name: spyre-device-plugin
