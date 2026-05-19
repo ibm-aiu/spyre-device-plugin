@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-    - main
+    - multi-arch-build
 
 permissions:
   contents: read
