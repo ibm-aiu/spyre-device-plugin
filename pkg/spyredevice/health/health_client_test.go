@@ -96,39 +96,6 @@ func NewDummyServer() *DummyServer {
 	return NewDummyServerWithSocket("")
 }
 
-func NewInsecureDummyServer() *DummyServer {
-	return NewInsecureDummyServerWithSocket("")
-}
-
-func NewInsecureDummyServerWithSocket(socketPath string) *DummyServer {
-	if socketPath == "" {
-		socketPath = generateTestSock()
-	}
-	os.Setenv(SpyreHealthSocketEnvKey, socketPath)
-	By("Starting insecure dummy server")
-
-	grpcServer := grpc.NewServer()
-	dummyServer := &DummyServer{
-		deviceQueue: make(chan *pb.Devices),
-		quit:        make(chan struct{}),
-		grpcServer:  grpcServer,
-		SocketPath:  socketPath,
-	}
-	pb.RegisterSpyreHealthServiceServer(grpcServer, dummyServer)
-	go func() {
-		lis, err := net.Listen("unix", socketPath)
-		Expect(err).NotTo(HaveOccurred())
-		By(fmt.Sprintf("Listening at %s (insecure)", socketPath))
-		err = grpcServer.Serve(lis)
-		Expect(err).NotTo(HaveOccurred())
-	}()
-	Eventually(func() bool {
-		_, err := os.Stat(socketPath)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond).Should(BeTrue(), "expected file to exist within timeout")
-	return dummyServer
-}
-
 func NewDummyServerWithSocket(socketPath string) *DummyServer {
 	if socketPath == "" {
 		socketPath = generateTestSock()
@@ -500,40 +467,6 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 		})
 	})
 
-	Context("Insecure Mode", func() {
-		It("should connect without TLS when insecure parameter is true", func() {
-			dummyServer := NewInsecureDummyServer()
-			defer dummyServer.Stop()
-
-			client, err := NewSpyreHealthClient(true) // insecure mode
-			Expect(err).NotTo(HaveOccurred())
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			updateChan := make(chan struct{})
-			err = client.Start(ctx, updateChan, &pb.Devices{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(client.Running()).To(BeTrue())
-
-			client.Stop()
-		})
-
-		It("should fail to connect to insecure server when insecure parameter is false", func() {
-			dummyServer := NewInsecureDummyServer()
-			defer dummyServer.Stop()
-
-			client, err := NewSpyreHealthClient(false) // secure mode (TLS)
-			Expect(err).NotTo(HaveOccurred())
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			updateChan := make(chan struct{})
-			err = client.Start(ctx, updateChan, &pb.Devices{})
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to register"))
-		})
-	})
-
 	Context("Lifecycle", Ordered, func() {
 		var dummyServer *DummyServer
 		var client *SpyreHealthClient
@@ -544,7 +477,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			ctx, cancel = context.WithCancel(context.Background())
 			var err error
 			dummyServer = NewDummyServer()
-			client, err = NewSpyreHealthClient(false) // secure mode (TLS)
+			client, err = NewSpyreHealthClient()
 			Expect(err).NotTo(HaveOccurred())
 			updateChan = make(chan struct{})
 			err = client.Start(ctx, updateChan, &pb.Devices{})
@@ -684,7 +617,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			// Start initial server
 			dummyServer = NewDummyServer()
 			var err error
-			client, err = NewSpyreHealthClient(false) // secure mode (TLS)
+			client, err = NewSpyreHealthClient()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Configure for faster reconnection in tests
@@ -743,7 +676,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			// Start server
 			dummyServer = NewDummyServer()
 			var err error
-			client, err = NewSpyreHealthClient(false) // secure mode (TLS)
+			client, err = NewSpyreHealthClient()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Configure for slower reconnection to test quit
@@ -778,7 +711,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			// Start server then stop it immediately to test reconnection failure
 			dummyServer = NewDummyServer()
 			var err error
-			client, err = NewSpyreHealthClient(false) // secure mode (TLS)
+			client, err = NewSpyreHealthClient()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Configure for fast failure with limited attempts

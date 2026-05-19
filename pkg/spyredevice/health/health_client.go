@@ -21,7 +21,6 @@ import (
 	pb "github.com/ibm-aiu/spyre-health-checker/pkg/health/spyre"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -94,7 +93,6 @@ type SpyreHealthClient struct {
 	healthInfoMap map[string]any
 	mu            sync.RWMutex // Protects healthInfoMap and conn
 	conn          *grpc.ClientConn
-	insecure      bool // If true, connect without TLS
 
 	running              atomic.Bool
 	quit                 chan interface{}
@@ -105,7 +103,7 @@ type SpyreHealthClient struct {
 	backoffMultiplier    float64
 }
 
-func NewSpyreHealthClient(insecure bool) (*SpyreHealthClient, error) {
+func NewSpyreHealthClient() (*SpyreHealthClient, error) {
 	socketName, err := spyreHealthSocket()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spyrehealth socket: %w", err)
@@ -113,7 +111,6 @@ func NewSpyreHealthClient(insecure bool) (*SpyreHealthClient, error) {
 	return &SpyreHealthClient{
 		socketName:           socketName,
 		healthInfoMap:        make(map[string]any),
-		insecure:             insecure,
 		quit:                 make(chan interface{}),
 		maxReconnectAttempts: DefaultMaxReconnectAttempts,
 		initialBackoff:       DefaultInitialBackoff,
@@ -173,22 +170,13 @@ func (t *SpyreHealthClient) Register(ctx context.Context, updateChan chan struct
 	}
 	var err error
 
-	var dialOpts []grpc.DialOption
-
-	if t.insecure {
-		glog.Warning("Using insecure connection for spyre health client (TLS disabled)")
-		dialOpts = []grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		}
-	} else {
-		creds, err := loadTLSCredentials() // pragma: allowlist secret
-		if err != nil {
-			return fmt.Errorf("failed to load TLS credentials: %w", err) // pragma: allowlist secret
-		}
-		glog.Info("Using TLS for spyre health client connection")
-		dialOpts = []grpc.DialOption{
-			grpc.WithTransportCredentials(creds),
-		}
+	creds, err := loadTLSCredentials() // pragma: allowlist secret
+	if err != nil {
+		return fmt.Errorf("failed to load TLS credentials: %w", err) // pragma: allowlist secret
+	}
+	glog.Info("Using TLS for spyre health client connection")
+	dialOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(creds),
 	}
 
 	t.mu.Lock()
