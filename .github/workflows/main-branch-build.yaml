@@ -16,5 +16,9 @@ permissions:
   packages: write # Crucial for pushing to ghcr.io
 
 jobs:
-  build-amd64:
+  build:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/build-image.yaml@main
+    with:
+      dockerfile: ./images/Dockerfile.ubi9
+      pre_build_command: make vendor
+      image_name: spyre-device-plugin
