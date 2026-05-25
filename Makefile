@@ -17,7 +17,6 @@ DOCKER_BUILD_OPTS	?= --progress=plain
 IMAGE_NAME 			:= $(REGISTRY)/spyre-device-plugin
 IMAGE_TAG 			?= $(VERSION)
 IMAGE 				?= $(IMAGE_NAME):$(IMAGE_TAG)
-TEST_IMG			?= $(IMAGE_NAME):dev
 CODECOV_PERCENT		?= 51
 KUBECTL				?= $(shell command -v oc 2> /dev/null || echo kubectl)
 OC					?= $(shell command -v oc)
