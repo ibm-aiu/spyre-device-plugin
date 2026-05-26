@@ -15,7 +15,10 @@ import (
 
 var ReconcileReservation = reconcileReservation
 
-func (w *PodWatcher) GetAllocation(ctx context.Context, p corev1.Pod) (*spyrev1alpha1.SpyreNodeState, int, *spyrev1alpha1.Allocation, error) {
+func (w *PodWatcher) GetAllocation(
+	ctx context.Context,
+	p corev1.Pod,
+) (*spyrev1alpha1.SpyreNodeState, int, *spyrev1alpha1.Allocation, error) {
 	return w.getAllocation(ctx, p)
 }
 

@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	NoGeneralKeyErr = fmt.Errorf("cannot find %s config", GeneralKey)
+	ErrNoGeneralKey = fmt.Errorf("cannot find %s config", GeneralKey)
 )
 
 type SenlibConfigGeneral struct {
@@ -102,7 +102,8 @@ GenerateConfigContent generates config json file based on senlib config template
     2.1. For `METRICS.enable: true`, set path to /tmp/spyre-metrics/metrics.%BUSID
     2.2. Otherwise, set to metrics.%BUSID (default value)
 */
-func (g SenlibConfigGenerator) GenerateConfigContent(resourcePool string, busIds []string, metricsPath string) (content []byte, err error) {
+func (g SenlibConfigGenerator) GenerateConfigContent(
+	resourcePool string, busIds []string, metricsPath string) (content []byte, err error) {
 	configMap := maps.Clone(g.configMap)
 	if generalConfigInterface, found := configMap[GeneralKey]; found {
 		if _, ok := generalConfigInterface.(map[string]any); ok {
@@ -161,7 +162,7 @@ func (g SenlibConfigGenerator) GenerateConfigContent(resourcePool string, busIds
 			err = fmt.Errorf("failed to parse GENERAL: %v", generalConfigInterface)
 		}
 	} else {
-		err = NoGeneralKeyErr
+		err = ErrNoGeneralKey
 	}
 	return content, err
 }

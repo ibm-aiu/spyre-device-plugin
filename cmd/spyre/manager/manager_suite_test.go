@@ -32,25 +32,25 @@ var (
 )
 
 var _ = BeforeSuite(func() {
-	utils.CreateFolderIfNotExists(testHostPath)
-	os.Setenv(spyreconf.MetricsHostPathKey, testMetricsHostPath)
+	err := utils.CreateFolderIfNotExists(testHostPath)
+	Expect(err).NotTo(HaveOccurred())
+	_ = os.Setenv(spyreconf.MetricsHostPathKey, testMetricsHostPath)
 
 	// Set up envtest for controller-runtime manager
 	testEnv = &envtest.Environment{}
-	var err error
 	testCfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(testCfg).NotTo(BeNil())
 
 	// Set the test config as the default for controller-runtime
 	// This allows ctrl.GetConfigOrDie() to work in tests
-	os.Setenv("KUBECONFIG", testCfg.Host)
+	_ = os.Setenv("KUBECONFIG", testCfg.Host)
 })
 
 var _ = AfterSuite(func() {
-	os.Unsetenv(spyreconf.MetricsHostPathKey)
-	os.Unsetenv("KUBECONFIG")
-	os.RemoveAll(testHostPath)
+	_ = os.Unsetenv(spyreconf.MetricsHostPathKey)
+	_ = os.Unsetenv("KUBECONFIG")
+	_ = os.RemoveAll(testHostPath)
 
 	// Stop the test environment
 	if testEnv != nil {

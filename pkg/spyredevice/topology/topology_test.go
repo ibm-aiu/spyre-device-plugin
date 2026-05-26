@@ -35,6 +35,8 @@ const (
 	topoV2FilePath         = "../../../test/data/topo_v2.json"
 	devicePath             = "../../../test/data/device_path"
 	pseudoTopologyFilePath = "../../../images/init-container-assets/pseudo-topology.json"
+	node1Name              = "node1"
+	node2Name              = "node2"
 )
 
 var zeroDistance = 2
@@ -205,7 +207,7 @@ var firstTier1Group = append(firstTier0Group, secondTier0Group...)
 var secondTier1Group = append(thirdTier0Group, fourthTier0Group...)
 
 func getAllDevices() []string {
-	devices := []string{}
+	devices := make([]string, 0, len(deviceDistances))
 	for dev := range deviceDistances {
 		devices = append(devices, dev)
 	}
@@ -250,12 +252,18 @@ func pfTierResourceName(suffix string) string {
 	return spyreconst.PfResourceName + suffix
 }
 
-var tier0RemainCandidates = [][]string{{"00:02", "00:03", "00:04"}, {"00:06", "00:07", "00:08"}, {"00:10", "00:11", "00:12"}, {"00:14", "00:15", "00:16"}}
+var tier0RemainCandidates = [][]string{
+	{"00:02", "00:03", "00:04"},
+	{"00:06", "00:07", "00:08"},
+	{"00:10", "00:11", "00:12"},
+	{"00:14", "00:15", "00:16"},
+}
 var tier1RemainCandidates = [][]string{
 	append(tier0RemainCandidates[0], []string{"00:05", "00:06", "00:07", "00:08"}...),
 	append(tier0RemainCandidates[2], []string{"00:13", "00:14", "00:15", "00:16"}...),
 }
-var tier2Remain = append(tier1RemainCandidates[0], []string{"00:09", "00:10", "00:11", "00:12", "00:13", "00:14", "00:15", "00:16"}...)
+var tier2Remain = append(tier1RemainCandidates[0],
+	[]string{"00:09", "00:10", "00:11", "00:12", "00:13", "00:14", "00:15", "00:16"}...)
 
 func generateTopologyFromDistance(deviceDistances map[string]map[string]int) *pcitopov2.Pcitopo {
 	topo := &pcitopov2.Pcitopo{
@@ -320,14 +328,14 @@ var _ = Describe("Test Topology", func() {
 
 	Context("Topology test with pseudoDevice", func() {
 		BeforeEach(func() {
-			os.Setenv("NODE_NAME", "node1")
-			os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
-			os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
+			_ = os.Setenv("NODE_NAME", node1Name)
+			_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
+			_ = os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
 			PciTopology = generateTopologyFromDistance(deviceDistances)
 		})
 		AfterEach(func() {
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
-			os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
 			PciTopology = nil
 		})
 		DescribeTable("GetMaxValidPeers",
@@ -376,17 +384,26 @@ var _ = Describe("Test Topology", func() {
 				}
 			},
 
-			Entry("tier0, no self allocation", spyreconst.TierZeroResourceNameSuffix, noSelfAllocated, [][]string{firstTier0Group, secondTier0Group, thirdTier0Group, fourthTier0Group}),
-			Entry("tier0, first allocated", spyreconst.TierZeroResourceNameSuffix, firstTier0SelfAllocated, [][]string{secondTier0Group, thirdTier0Group, fourthTier0Group}),
-			Entry("tier0, more than one allocated", spyreconst.TierZeroResourceNameSuffix, moreThanOneTier0SelfAllocated, [][]string{thirdTier0Group, fourthTier0Group}),
-			Entry("tier0, all group allocated but remains", spyreconst.TierZeroResourceNameSuffix, allTier0SelfAllocated, tier0RemainCandidates),
+			Entry("tier0, no self allocation", spyreconst.TierZeroResourceNameSuffix, noSelfAllocated,
+				[][]string{firstTier0Group, secondTier0Group, thirdTier0Group, fourthTier0Group}),
+			Entry("tier0, first allocated", spyreconst.TierZeroResourceNameSuffix, firstTier0SelfAllocated,
+				[][]string{secondTier0Group, thirdTier0Group, fourthTier0Group}),
+			Entry("tier0, more than one allocated", spyreconst.TierZeroResourceNameSuffix, moreThanOneTier0SelfAllocated,
+				[][]string{thirdTier0Group, fourthTier0Group}),
+			Entry("tier0, all group allocated but remains", spyreconst.TierZeroResourceNameSuffix, allTier0SelfAllocated,
+				tier0RemainCandidates),
 
-			Entry("tier1, no self allocation", spyreconst.TierOneResourceNameSuffix, noSelfAllocated, [][]string{firstTier1Group, secondTier1Group}),
-			Entry("tier1, first allocated", spyreconst.TierOneResourceNameSuffix, firstTier1SelfAllocated, [][]string{secondTier1Group}),
-			Entry("tier1, all group allocated but remains", spyreconst.TierOneResourceNameSuffix, allTier1SelfAllocated, tier1RemainCandidates),
+			Entry("tier1, no self allocation", spyreconst.TierOneResourceNameSuffix, noSelfAllocated,
+				[][]string{firstTier1Group, secondTier1Group}),
+			Entry("tier1, first allocated", spyreconst.TierOneResourceNameSuffix, firstTier1SelfAllocated,
+				[][]string{secondTier1Group}),
+			Entry("tier1, all group allocated but remains", spyreconst.TierOneResourceNameSuffix, allTier1SelfAllocated,
+				tier1RemainCandidates),
 
-			Entry("tier2, no self allocation", spyreconst.TierTwoResourceNameSuffix, noSelfAllocated, [][]string{allDevices}),
-			Entry("tier2, allocated but remains", spyreconst.TierTwoResourceNameSuffix, firstTier0SelfAllocated, [][]string{tier2Remain}),
+			Entry("tier2, no self allocation", spyreconst.TierTwoResourceNameSuffix, noSelfAllocated,
+				[][]string{allDevices}),
+			Entry("tier2, allocated but remains", spyreconst.TierTwoResourceNameSuffix, firstTier0SelfAllocated,
+				[][]string{tier2Remain}),
 			Entry("tier0, all allocated", spyreconst.TierZeroResourceNameSuffix, allAllocated, [][]string{}),
 
 			Entry("tier1, all allocated", spyreconst.TierZeroResourceNameSuffix, allAllocated, [][]string{}),
@@ -409,11 +426,14 @@ var _ = Describe("Test Topology", func() {
 			Entry("valid 2nd tier0", spyreconst.TierZeroResourceNameSuffix, secondTier0Group, nil),
 			Entry("valid 3rd tier0", spyreconst.TierZeroResourceNameSuffix, thirdTier0Group, nil),
 			Entry("valid 4th tier0", spyreconst.TierZeroResourceNameSuffix, fourthTier0Group, nil),
-			Entry("invalid tier0", spyreconst.TierZeroResourceNameSuffix, append(firstTier0Group, secondTier0Group[0]), pcitopov2.OutOfExpectedTierErr),
-			Entry("invalid deviceID", spyreconst.TierZeroResourceNameSuffix, append([]string{"invalidDevice"}, firstTier0Group...), pcitopov2.DeviceNotFoundErr),
+			Entry("invalid tier0", spyreconst.TierZeroResourceNameSuffix,
+				append(firstTier0Group, secondTier0Group[0]), pcitopov2.OutOfExpectedTierErr),
+			Entry("invalid deviceID", spyreconst.TierZeroResourceNameSuffix,
+				append([]string{"invalidDevice"}, firstTier0Group...), pcitopov2.DeviceNotFoundErr),
 			Entry("valid 1st tier1", spyreconst.TierOneResourceNameSuffix, firstTier1Group, nil),
 			Entry("valid 2nd tier1", spyreconst.TierOneResourceNameSuffix, secondTier1Group, nil),
-			Entry("invalid tier1", spyreconst.TierOneResourceNameSuffix, append(firstTier1Group, secondTier1Group[0]), pcitopov2.OutOfExpectedTierErr),
+			Entry("invalid tier1", spyreconst.TierOneResourceNameSuffix,
+				append(firstTier1Group, secondTier1Group[0]), pcitopov2.OutOfExpectedTierErr),
 			Entry("valid tier2", spyreconst.TierTwoResourceNameSuffix, allDevices, nil),
 		)
 
@@ -421,7 +441,7 @@ var _ = Describe("Test Topology", func() {
 			originFolder := DefaultTopologyFolder
 			DefaultTopologyFolder = topologyFolder
 			topologyFile := GetTopologyFile()
-			expectedTopologyFile := filepath.Join(topologyFolder, "node1")
+			expectedTopologyFile := filepath.Join(topologyFolder, node1Name)
 			Expect(topologyFile).To(Equal(expectedTopologyFile))
 			_, err := GetPciTopology(topologyFile, false)
 			Expect(err).To(BeNil())
@@ -433,11 +453,11 @@ var _ = Describe("Test Topology", func() {
 		var spyreClient *spyreclient.SpyreClient
 		var err error
 		var namespace string
-		nodeList := []string{"node1", "node2"}
-		os.Setenv("NODE_NAME", "node1")
+		nodeList := []string{node1Name, node2Name}
+		_ = os.Setenv("NODE_NAME", node1Name)
 
 		BeforeEach(func() {
-			os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
+			_ = os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
 			spyreClient, err = spyreclient.NewClient(context.Background(), Cfg)
 			Expect(err).To(BeNil())
 			Expect(spyreClient).NotTo((BeNil()))
@@ -468,7 +488,7 @@ var _ = Describe("Test Topology", func() {
 		})
 
 		AfterEach(func() {
-			os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
 			spyreClient, err = spyreclient.NewClient(context.Background(), Cfg)
 			Expect(err).To(BeNil())
 			Expect(spyreClient).NotTo((BeNil()))
@@ -506,22 +526,22 @@ var _ = Describe("Test Topology", func() {
 		})
 
 		BeforeEach(func() {
-			os.Setenv("NODE_NAME", "node1")
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Setenv("NODE_NAME", node1Name)
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			err := utils.CreateFolderIfNotExists(devicePath)
 			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
-			os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
 			PciTopology = nil
-			os.RemoveAll(devicePath)
+			_ = os.RemoveAll(devicePath)
 		})
 
 		It("use custom topology config folder", func() {
 			originFolder := DefaultTopologyFolder
 			DefaultTopologyFolder = topologyFolder
-			expectedTopologyFile := filepath.Join(topologyFolder, "node1")
+			expectedTopologyFile := filepath.Join(topologyFolder, node1Name)
 			Expect(utils.PathExists(expectedTopologyFile)).To(BeTrue())
 			topologyFile := GetTopologyFile()
 			Expect(topologyFile).To(Equal(expectedTopologyFile))
@@ -546,21 +566,21 @@ var _ = Describe("Test Topology", func() {
 			defer func() {
 				MetadataTopologyFilepath = origMetaTopo
 				if origIgnore == "" {
-					os.Unsetenv(IgnoreMetadataKey)
+					_ = os.Unsetenv(IgnoreMetadataKey)
 				} else {
-					os.Setenv(IgnoreMetadataKey, origIgnore)
+					_ = os.Setenv(IgnoreMetadataKey, origIgnore)
 				}
 			}()
 
 			tmpDir, err := os.MkdirTemp("", "topo-meta-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			tmpFile := filepath.Join(tmpDir, "topo.json")
 			Expect(os.WriteFile(tmpFile, []byte("{}"), 0644)).To(BeNil())
 
 			MetadataTopologyFilepath = tmpFile
-			os.Unsetenv(IgnoreMetadataKey)
+			_ = os.Unsetenv(IgnoreMetadataKey)
 
 			got := GetOriginalTopologyFile()
 			Expect(got).To(Equal(tmpFile))
@@ -574,19 +594,19 @@ var _ = Describe("Test Topology", func() {
 				MetadataTopologyFilepath = origMetaTopo
 				DefaultTopologyFolder = origDefaultFolder
 				if origNode == "" {
-					os.Unsetenv("NODE_NAME")
+					_ = os.Unsetenv("NODE_NAME")
 				} else {
-					os.Setenv("NODE_NAME", origNode)
+					_ = os.Setenv("NODE_NAME", origNode)
 				}
 			}()
 			MetadataTopologyFilepath = filepath.Join(os.TempDir(), "non-existent-topo.json")
 
 			tmpDir, err := os.MkdirTemp("", "topo-configmap-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			nodeName := "node-test-x"
-			os.Setenv("NODE_NAME", nodeName)
+			_ = os.Setenv("NODE_NAME", nodeName)
 			DefaultTopologyFolder = tmpDir
 
 			expected := filepath.Join(tmpDir, nodeName)
@@ -605,26 +625,26 @@ var _ = Describe("Test Topology", func() {
 				MetadataTopologyFilepath = origMetaTopo
 				DefaultTopologyFolder = origDefaultFolder
 				if origNode == "" {
-					os.Unsetenv("NODE_NAME")
+					_ = os.Unsetenv("NODE_NAME")
 				} else {
-					os.Setenv("NODE_NAME", origNode)
+					_ = os.Setenv("NODE_NAME", origNode)
 				}
 				if origIgnore == "" {
-					os.Unsetenv(IgnoreMetadataKey)
+					_ = os.Unsetenv(IgnoreMetadataKey)
 				} else {
-					os.Setenv(IgnoreMetadataKey, origIgnore)
+					_ = os.Setenv(IgnoreMetadataKey, origIgnore)
 				}
 			}()
 			MetadataTopologyFilepath = filepath.Join(os.TempDir(), "non-existent-topo.json")
 
 			tmpDir, err := os.MkdirTemp("", "topo-empty-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			nodeName := "node-test-y"
-			os.Setenv("NODE_NAME", nodeName)
+			_ = os.Setenv("NODE_NAME", nodeName)
 			DefaultTopologyFolder = tmpDir
-			os.Unsetenv(IgnoreMetadataKey)
+			_ = os.Unsetenv(IgnoreMetadataKey)
 
 			got := GetOriginalTopologyFile()
 			Expect(got).To(Equal(""))
@@ -640,7 +660,7 @@ var _ = Describe("Test Topology", func() {
 
 			tmpDir, err := os.MkdirTemp("", "topo-dynamic-current-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 			dynamicFile := filepath.Join(tmpDir, "topo.json")
 			Expect(os.WriteFile(dynamicFile, []byte("{}"), 0644)).To(BeNil())
 			DynamicTopologyFilepath = dynamicFile
@@ -659,22 +679,22 @@ var _ = Describe("Test Topology", func() {
 				DynamicTopologyFilepath = origDynamicFile
 				MetadataTopologyFilepath = origMetaTopo
 				if origIgnore == "" {
-					os.Unsetenv(IgnoreMetadataKey)
+					_ = os.Unsetenv(IgnoreMetadataKey)
 				} else {
-					os.Setenv(IgnoreMetadataKey, origIgnore)
+					_ = os.Setenv(IgnoreMetadataKey, origIgnore)
 				}
 			}()
 
 			tmpDir, err := os.MkdirTemp("", "topo-no-dynamic-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			DynamicTopologyFilepath = filepath.Join(tmpDir, "non-existent-dynamic.json")
 
 			tmpMeta := filepath.Join(tmpDir, "metadata-topo.json")
 			Expect(os.WriteFile(tmpMeta, []byte("{}"), 0644)).To(BeNil())
 			MetadataTopologyFilepath = tmpMeta
-			os.Unsetenv(IgnoreMetadataKey)
+			_ = os.Unsetenv(IgnoreMetadataKey)
 
 			got := GetCurrentTopologyFile()
 			Expect(got).To(Equal(tmpMeta))
@@ -688,7 +708,7 @@ var _ = Describe("Test Topology", func() {
 
 			tmpDir, err := os.MkdirTemp("", "topo-save-dynamic-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			dynFolder := filepath.Join(tmpDir, "dynamic")
 			dynFile := filepath.Join(dynFolder, "topo.json")
@@ -720,7 +740,7 @@ var _ = Describe("Test Topology", func() {
 
 			tmpDir, err := os.MkdirTemp("", "topo-ensure-exists-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			dynFile := filepath.Join(tmpDir, "topo.json")
 			DynamicTopologyFilepath = dynFile
@@ -739,7 +759,7 @@ var _ = Describe("Test Topology", func() {
 
 			tmpDir, err := os.MkdirTemp("", "topo-ensure-create-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 			dynFile := filepath.Join(tmpDir, "dynamic", "topo.json")
 			metaFile := filepath.Join(tmpDir, "metadata-topo.json")
 			DynamicTopologyFilepath = dynFile
@@ -767,7 +787,7 @@ var _ = Describe("Test Topology", func() {
 
 			tmpDir, err := os.MkdirTemp("", "topo-ensure-nooriginal-")
 			Expect(err).To(BeNil())
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 			// Setup paths to non-existent files
 			DynamicTopologyFilepath = filepath.Join(tmpDir, "dynamic", "topo.json")
 			MetadataTopologyFilepath = filepath.Join(tmpDir, "non-existent-meta.json")
@@ -781,12 +801,12 @@ var _ = Describe("Test Topology", func() {
 			Expect(utils.PathExists(topoV2FilePath)).To(BeTrue())
 			originTopofile := MetadataTopologyFilepath
 			MetadataTopologyFilepath = topoV2FilePath
-			os.Setenv(IgnoreMetadataKey, "true")
+			_ = os.Setenv(IgnoreMetadataKey, "true")
 			topologyFile := GetTopologyFile()
 			// After removing pcitopo, expect empty string (topology should come from init container)
 			Expect(topologyFile).To(Equal(""))
 			MetadataTopologyFilepath = originTopofile
-			os.Unsetenv(IgnoreMetadataKey)
+			_ = os.Unsetenv(IgnoreMetadataKey)
 		})
 
 		DescribeTable("can filter out missing devices", func(deviceList []string,
@@ -930,7 +950,7 @@ var _ = Describe("Test Topology", func() {
 	Context("Topology test without configmap", func() {
 		BeforeEach(func() {
 			if utils.PathExists(DynamicTopologyFilepath) {
-				os.Remove(DynamicTopologyFilepath)
+				_ = os.Remove(DynamicTopologyFilepath)
 			}
 		})
 
@@ -938,7 +958,7 @@ var _ = Describe("Test Topology", func() {
 			// reset global variable after each test
 			PciTopology = nil
 			if utils.PathExists(DynamicTopologyFilepath) {
-				os.Remove(DynamicTopologyFilepath)
+				_ = os.Remove(DynamicTopologyFilepath)
 			}
 		})
 
@@ -1394,7 +1414,7 @@ var _ = Describe("Test Topology", func() {
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 		})
 
 		It("should create dynamic topology file with correct content", func() {
@@ -1482,15 +1502,15 @@ var _ = Describe("Test Topology", func() {
 			DynamicTopologyFilepath = filepath.Join(tempDir, "dynamic", "topo.json")
 			DefaultTopologyFolder = filepath.Join(tempDir, "topology")
 
-			os.Setenv(IgnoreMetadataKey, "false")
+			_ = os.Setenv(IgnoreMetadataKey, "false")
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 			MetadataTopologyFilepath = originalMetadataPath
 			DynamicTopologyFilepath = originalDynamicPath
 			DefaultTopologyFolder = originalDefaultFolder
-			os.Unsetenv(IgnoreMetadataKey)
+			_ = os.Unsetenv(IgnoreMetadataKey)
 		})
 
 		It("should return metadata path when it exists", func() {
@@ -1547,7 +1567,7 @@ var _ = Describe("Test Topology", func() {
 		})
 
 		It("should respect IGNORE_EXTERNAL_METADATA flag", func() {
-			os.Setenv(IgnoreMetadataKey, "true")
+			_ = os.Setenv(IgnoreMetadataKey, "true")
 
 			err := os.MkdirAll(filepath.Dir(MetadataTopologyFilepath), 0755)
 			Expect(err).NotTo(HaveOccurred())
@@ -1577,7 +1597,7 @@ var _ = Describe("Test Topology", func() {
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 			MetadataTopologyFilepath = originalMetadataPath
 			DynamicTopologyFilepath = originalDynamicPath
 		})

@@ -42,7 +42,7 @@ var _ = Describe("Resource Server", func() {
 			Expect(r.GetPreferredAllocationAvailable).Should(BeFalse())
 		})
 		It("returns that preferred allocation is enabled with envval", func() {
-			os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+			_ = os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 			rs := &ResourceServer{}
 			r, err := rs.GetDevicePluginOptions(ctx, nil)
 			Expect(err).To(BeNil())
@@ -54,7 +54,7 @@ var _ = Describe("Resource Server", func() {
 		var err error
 		var namespace string
 		nodeList := []string{"node1", "node2"}
-		os.Setenv("NODE_NAME", "node1")
+		_ = os.Setenv("NODE_NAME", "node1")
 
 		BeforeEach(func() {
 			ctx := context.Background()
@@ -98,7 +98,7 @@ var _ = Describe("Resource Server", func() {
 		DeviceAllocationTrialLimit = 1
 		DescribeTable("classic allocation",
 			func(allocations map[string]bool, requested []string, nDev int32, expectedSelection []string) {
-				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
 				allocatedCh := make(chan types.AllocationInfo)
 				go ReadAllocation(allocatedCh, expectedSelection)
 				apiDevices := make(map[string]*pluginapi.Device)
@@ -135,10 +135,14 @@ var _ = Describe("Resource Server", func() {
 				}
 
 			},
-			Entry("request at empty allocation", map[string]bool{"01": false, "02": false}, []string{"01"}, oneNDev, []string{"01"}),
-			Entry("request at empty allocation with alternative devices", map[string]bool{"01": false, "02": false}, []string{"01", "02"}, oneNDev, []string{"01"}),
-			Entry("request at some device allocated", map[string]bool{"01": true, "02": false}, []string{"01", "02"}, oneNDev, []string{"02"}),
-			Entry("request at all devices allocated", map[string]bool{"01": true, "02": true}, []string{"01", "02"}, oneNDev, nil),
+			Entry("request at empty allocation",
+				map[string]bool{"01": false, "02": false}, []string{"01"}, oneNDev, []string{"01"}),
+			Entry("request at empty allocation with alternative devices",
+				map[string]bool{"01": false, "02": false}, []string{"01", "02"}, oneNDev, []string{"01"}),
+			Entry("request at some device allocated",
+				map[string]bool{"01": true, "02": false}, []string{"01", "02"}, oneNDev, []string{"02"}),
+			Entry("request at all devices allocated",
+				map[string]bool{"01": true, "02": true}, []string{"01", "02"}, oneNDev, nil),
 		)
 	})
 
