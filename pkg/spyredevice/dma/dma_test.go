@@ -48,7 +48,7 @@ var _ = Describe("DMA", func() {
 			// create resource2 file
 			file, err := os.OpenFile(devResourceFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 			Expect(err).To(BeNil())
-			defer func() { _ = file.Close() }()
+			defer file.Close()
 		})
 
 		AfterEach(func() {
@@ -56,47 +56,45 @@ var _ = Describe("DMA", func() {
 			Expect(err).To(BeNil())
 		})
 
-		DescribeTable(
-			"Set-UnsetDevResourceFilePermissions",
-			func(goodDevices []string, requestDevices []string, errorExpected bool) {
-				By("Setting good devices")
-				for _, dev := range goodDevices {
-					devPath := filepath.Join(tmpSysBusPciPath, dev)
-					err := utils.CreateFolderIfNotExists(devPath)
-					Expect(err).NotTo(HaveOccurred())
-					defer func() {
-						_ = os.RemoveAll(devPath)
-					}()
-					file, err := os.OpenFile(filepath.Join(devPath, "resource2"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-					Expect(err).To(BeNil())
-					defer func() { _ = file.Close() }()
-				}
-				By("Testing SetDevResourceFilePermissions")
-				err := SetDevResourceFilePermissions(requestDevices)
-				if errorExpected {
-					By("Testing undo")
-					for _, dev := range requestDevices {
-						if slices.Contains(goodDevices, dev) {
-							devPath := filepath.Join(tmpSysBusPciPath, dev)
-							resourceFile := filepath.Join(devPath, "resource2")
-							checkFilePermission(resourceFile, 0600)
-						}
-					}
-					return
-				}
+		DescribeTable("Set-UnsetDevResourceFilePermissions", func(goodDevices []string, requestDevices []string, errorExpected bool) {
+			By("Setting good devices")
+			for _, dev := range goodDevices {
+				devPath := filepath.Join(tmpSysBusPciPath, dev)
+				err := utils.CreateFolderIfNotExists(devPath)
 				Expect(err).NotTo(HaveOccurred())
+				defer func() {
+					os.RemoveAll(devPath)
+				}()
+				file, err := os.OpenFile(filepath.Join(devPath, "resource2"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+				Expect(err).To(BeNil())
+				defer file.Close()
+			}
+			By("Testing SetDevResourceFilePermissions")
+			err := SetDevResourceFilePermissions(requestDevices)
+			if errorExpected {
+				By("Testing undo")
 				for _, dev := range requestDevices {
-					devPath := filepath.Join(tmpSysBusPciPath, dev)
-					resourceFile := filepath.Join(devPath, "resource2")
-					checkFilePermission(resourceFile, 0666)
+					if slices.Contains(goodDevices, dev) {
+						devPath := filepath.Join(tmpSysBusPciPath, dev)
+						resourceFile := filepath.Join(devPath, "resource2")
+						checkFilePermission(resourceFile, 0600)
+					}
 				}
-				UnsetDevResourceFilePermissions(requestDevices)
-				for _, dev := range requestDevices {
-					devPath := filepath.Join(tmpSysBusPciPath, dev)
-					resourceFile := filepath.Join(devPath, "resource2")
-					checkFilePermission(resourceFile, 0600)
-				}
-			},
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+			for _, dev := range requestDevices {
+				devPath := filepath.Join(tmpSysBusPciPath, dev)
+				resourceFile := filepath.Join(devPath, "resource2")
+				checkFilePermission(resourceFile, 0666)
+			}
+			UnsetDevResourceFilePermissions(requestDevices)
+			for _, dev := range requestDevices {
+				devPath := filepath.Join(tmpSysBusPciPath, dev)
+				resourceFile := filepath.Join(devPath, "resource2")
+				checkFilePermission(resourceFile, 0600)
+			}
+		},
 			Entry("single good device", []string{"10:00.0"}, []string{"10:00.0"}, false),
 			Entry("multiple good devices", []string{"10:00.0", "11:00.0"}, []string{"10:00.0", "11:00.0"}, false),
 			Entry("mixed multiple devices - tail failed", []string{"10:00.0", "11:00.0"}, []string{"10:00.0", "12:00.0"}, true),
@@ -119,12 +117,12 @@ var _ = Describe("DMA", func() {
 		multipleDevices := []string{"dev01", "dev02"}
 		DescribeTable("NeedP2PDMAConfigure", func(deviceList []string, p2pDMA, pseudoMode, expected bool) {
 			if pseudoMode {
-				_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
-				defer func() { _ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey()) }()
+				os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
+				defer os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			}
 			if p2pDMA {
-				_ = os.Setenv(P2PDMAEnvKey, spyreconst.ModeEnabledValue)
-				defer func() { _ = os.Unsetenv(P2PDMAEnvKey) }()
+				os.Setenv(P2PDMAEnvKey, spyreconst.ModeEnabledValue)
+				defer os.Unsetenv(P2PDMAEnvKey)
 			}
 			support := NeedP2PDMAConfigure(deviceList)
 			Expect(support).To(Equal(expected))

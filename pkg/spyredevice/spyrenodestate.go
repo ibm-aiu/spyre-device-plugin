@@ -47,14 +47,9 @@ var NodeNameEnvKey = utils.NodeNameEnvKey
 // it can perform out-of-cluster test.
 // skipTopologyUpdate: if true, only updates SpyreInterfaces/SpyreSSAInterfaces without updating Pcitopo.
 // This is useful during hotplug events where topology should only be updated by pci_watcher.
-func WriteSpyreInterfacesToNodeState(
-	ctx context.Context,
-	cfg *rest.Config,
-	pciDevices []types.PciDevice,
-	spyreClient *spyreclient.SpyreClient,
-	skipTopologyUpdate bool,
-	updatedUnhealthyDevices []spyrev1alpha1.UnhealthyDevice,
-) (*spyrev1alpha1.SpyreNodeState, error) {
+func WriteSpyreInterfacesToNodeState(ctx context.Context, cfg *rest.Config,
+	pciDevices []types.PciDevice, spyreClient *spyreclient.SpyreClient,
+	skipTopologyUpdate bool, updatedUnhealthyDevices []spyrev1alpha1.UnhealthyDevice) (*spyrev1alpha1.SpyreNodeState, error) {
 
 	if spyreClient == nil {
 		return nil, fmt.Errorf("spyreClient is not initialized, skip writing SpyreNodeState")
@@ -74,9 +69,7 @@ func WriteSpyreInterfacesToNodeState(
 
 	glog.V(1).Infof("Applying up-to-date device status to SpyreNodeState...")
 	spyreInterfaceMap, spyreSSAInterfaceMap := getSpyreInterfaceMaps(pciDevices)
-	specChanged, statusChanged := updateSpyreInterfacesChanges(
-		nodeState, spyreInterfaceMap, spyreSSAInterfaceMap, updatedUnhealthyDevices,
-	)
+	specChanged, statusChanged := updateSpyreInterfacesChanges(nodeState, spyreInterfaceMap, spyreSSAInterfaceMap, updatedUnhealthyDevices)
 
 	status := nodeState.Status
 	// This is tentative behavior until the time we enable the feature to automatically call pcitopo command.
@@ -206,8 +199,7 @@ func getSpyreInterfaceMaps(pciDevices []types.PciDevice) (map[string]*spyrev1alp
 
 func updateSpyreInterfacesChanges(nodeState *spyrev1alpha1.SpyreNodeState,
 	spyreInterfaceMap map[string]*spyrev1alpha1.SpyreInterface,
-	spyreSSAInterfaceMap map[string]*spyrev1alpha1.SpyreSSAInterface,
-	updatedUnhealthyDevices []spyrev1alpha1.UnhealthyDevice) (bool, bool) {
+	spyreSSAInterfaceMap map[string]*spyrev1alpha1.SpyreSSAInterface, updatedUnhealthyDevices []spyrev1alpha1.UnhealthyDevice) (bool, bool) {
 	var specChanged bool
 	// Update device info if new info != existing info
 	for pciAddress, info := range spyreInterfaceMap {
@@ -385,8 +377,7 @@ func containsSSADevice(nodeState *spyrev1alpha1.SpyreNodeState, pciAddress strin
 }
 
 // Returns a deep copy of SpyreNodeState resource of the node on which the device plugin runs.
-func GetNodeStateForThisNode(
-	ctx context.Context, spyreClient *spyreclient.SpyreClient) (*spyrev1alpha1.SpyreNodeState, error) {
+func GetNodeStateForThisNode(ctx context.Context, spyreClient *spyreclient.SpyreClient) (*spyrev1alpha1.SpyreNodeState, error) {
 	nodeName := os.Getenv(NodeNameEnvKey)
 	return spyreClient.Get(ctx, nodeName)
 }

@@ -38,7 +38,7 @@ const (
 func NewPciDevice(dev *ghw.PCIDevice, rFactory types.ResourceFactory,
 	rc *types.ResourceConfig) (types.PciDevice, error) {
 
-	infoProviders := make([]types.DeviceInfoProvider, 0, 1)
+	infoProviders := make([]types.DeviceInfoProvider, 0)
 
 	driverName, err := utils.GetDriverName(dev.Address)
 	if err != nil {

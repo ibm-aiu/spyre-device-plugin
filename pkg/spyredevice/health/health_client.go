@@ -201,12 +201,8 @@ func (t *SpyreHealthClient) Register(ctx context.Context, updateChan chan struct
 	return nil
 }
 
-func (t *SpyreHealthClient) listen(
-	ctx context.Context,
-	stream pb.SpyreHealthService_RegisterForSpyreDevicesEventsClient,
-	updateChan chan struct{},
-	devices *pb.Devices,
-) error {
+func (t *SpyreHealthClient) listen(ctx context.Context,
+	stream pb.SpyreHealthService_RegisterForSpyreDevicesEventsClient, updateChan chan struct{}, devices *pb.Devices) error {
 	defer func() {
 		t.running.Store(false)
 		t.mu.Lock()

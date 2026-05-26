@@ -1,5 +1,3 @@
-version: 2
-
 run:
   timeout: 10m
   allow-parallel-runners: true
@@ -29,6 +27,9 @@ linters:
   - copyloopvar
   - goconst
   - gocyclo
+  - gofmt
+  - goimports
+  - gosimple
   - govet
   - ineffassign
   - lll
@@ -36,15 +37,12 @@ linters:
   - nakedret
   - prealloc
   - staticcheck
+  - typecheck
   - unconvert
   - unparam
   - unused
+  - gocritic
 
 linters-settings:
   lll:
     line-length: 140
-
-formatters:
-  enable:
-  - gofmt
-  - goimports

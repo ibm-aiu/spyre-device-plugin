@@ -85,7 +85,7 @@ func (h *HealthInfoHandler) Start(ctx context.Context, pciDevices []types.PciDev
 	}
 
 	// convert to pb.Devices
-	pbDevices := make([]*pb.Device, len(pciDevices), len(pciDevices)+len(pciDevices))
+	pbDevices := make([]*pb.Device, len(pciDevices))
 	for _, dev := range pciDevices {
 		pbDevice := &pb.Device{
 			DeviceID: &pb.DeviceID{
@@ -238,14 +238,7 @@ func (h *HealthInfoHandler) writeDevicesToNodeState(ctx context.Context,
 	}
 
 	// This prevents redundant topology updates and ensures only pci_watcher controls topology
-	_, err := spyredevice.WriteSpyreInterfacesToNodeState(
-		ctx,
-		h.cfg,
-		uniqueDeviceSlice,
-		h.spyreClient,
-		false,
-		unhealthyDevices,
-	)
+	_, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, h.cfg, uniqueDeviceSlice, h.spyreClient, false, unhealthyDevices)
 	if err != nil {
 		glog.Errorf("Failed to update SpyreNodeState: %v", err)
 	}
