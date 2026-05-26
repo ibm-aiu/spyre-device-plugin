@@ -28,16 +28,12 @@ var (
 	pfConfigFileName   = "config.json"
 	vfConfigFileName   = "vf_config.json"
 	defaultPfPoolNames = []string{"spyre_pf"}
-	perDevicePoolNames = []string{"spyre_pf_0000_1a_00.0",
-		"spyre_pf_0000_1c_00.0", "spyre_pf_0000_1d_00.0", "spyre_pf_0000_1e_00.0",
+	perDevicePoolNames = []string{"spyre_pf_0000_1a_00.0", "spyre_pf_0000_1c_00.0", "spyre_pf_0000_1d_00.0", "spyre_pf_0000_1e_00.0",
 		"spyre_pf_0000_3d_00.0", "spyre_pf_0000_3f_00.0", "spyre_pf_0000_40_00.0", "spyre_pf_0000_41_00.0"}
-	vfPerDevicePoolNames = []string{"spyre_vf_0000_1a_00.0",
-		"spyre_vf_0000_1c_00.0", "spyre_vf_0000_1d_00.0", "spyre_vf_0000_1e_00.0",
+	vfPerDevicePoolNames = []string{"spyre_vf_0000_1a_00.0", "spyre_vf_0000_1c_00.0", "spyre_vf_0000_1d_00.0", "spyre_vf_0000_1e_00.0",
 		"spyre_vf_0000_3d_00.0", "spyre_vf_0000_3f_00.0", "spyre_vf_0000_40_00.0", "spyre_vf_0000_41_00.0"}
-	isolatedVfPerDevicePoolNames = []string{
-		"spyre_vf_0001_00_00.0", "spyre_vf_0002_00_00.0", "spyre_vf_0003_00_00.0", "spyre_vf_0004_00_00.0",
-		"spyre_vf_0005_00_00.0", "spyre_vf_0006_00_00.0", "spyre_vf_0007_00_00.0", "spyre_vf_0008_00_00.0",
-	}
+	isolatedVfPerDevicePoolNames = []string{"spyre_vf_0001_00_00.0", "spyre_vf_0002_00_00.0", "spyre_vf_0003_00_00.0", "spyre_vf_0004_00_00.0",
+		"spyre_vf_0005_00_00.0", "spyre_vf_0006_00_00.0", "spyre_vf_0007_00_00.0", "spyre_vf_0008_00_00.0"}
 	topologyAwarePoolNames   = []string{"spyre_pf_tier0", "spyre_pf_tier1", "spyre_pf_tier2"}
 	vfTopologyAwarePoolNames = []string{"spyre_vf_tier0", "spyre_vf_tier1", "spyre_vf_tier2"}
 	vfEnabledPoolNames       = []string{"spyre_pf", "spyre_vf"}
@@ -46,45 +42,45 @@ var (
 var _ = Describe("Manager", Ordered, func() {
 
 	BeforeAll(func() {
-		_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
+		os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
 		if utils.PathExists(spyretopo.DynamicTopologyFilepath) {
-			_ = os.Remove(spyretopo.DynamicTopologyFilepath)
+			os.Remove(spyretopo.DynamicTopologyFilepath)
 		}
 		spyretopo.PciTopology = nil
 	})
 
 	AfterAll(func() {
-		_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+		os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 		if utils.PathExists(spyretopo.DynamicTopologyFilepath) {
-			_ = os.Remove(spyretopo.DynamicTopologyFilepath)
+			os.Remove(spyretopo.DynamicTopologyFilepath)
 		}
 		spyretopo.PciTopology = nil
 	})
 
 	Context("with topology file", func() {
 		BeforeEach(func() {
-			_ = os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
+			os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
 		})
 		AfterEach(func() {
-			_ = os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
+			os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
 		})
 
 		Context("physical devices", Ordered, func() {
 			BeforeEach(func() {
-				_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
 			})
 			AfterEach(func() {
-				_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
 			})
 
 			DescribeTable("can correctly advertise", func(perDevice bool, topologyAware bool, expectedPoolNames []string) {
 				if perDevice {
-					_ = os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+					os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				}
 				if topologyAware {
-					_ = os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+					os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				}
 				By("calling initManagerAndGetResourceServers")
 				rsList := initManagerAndGetResourceServers(pfConfigFileName)
@@ -108,12 +104,12 @@ var _ = Describe("Manager", Ordered, func() {
 				if runtime.GOARCH == "s390x" {
 					Skip("Card Management VF are not supported on s390x")
 				}
-				_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
 			})
 			AfterEach(func() {
-				_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
 			})
 
 			DescribeTable("GetPseudoVfAddress", func(pfAddress string, vfIndex int, expected string) {
@@ -137,10 +133,10 @@ var _ = Describe("Manager", Ordered, func() {
 
 			DescribeTable("can correctly advertise", func(perDevice bool, topologyAware bool, expectedPoolNames []string) {
 				if perDevice {
-					_ = os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+					os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				}
 				if topologyAware {
-					_ = os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+					os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				}
 				rsList := initManagerAndGetResourceServers(vfConfigFileName)
 				Expect(rsList).Should(HaveLen(len(expectedPoolNames)))
@@ -183,7 +179,7 @@ var _ = Describe("Manager", Ordered, func() {
 			)
 
 			It("can ignore vf resource", func() {
-				_ = os.Setenv(spyrev1alpha1.DisableVfMode.EnvKey(), spyreconst.ModeEnabledValue)
+				os.Setenv(spyrev1alpha1.DisableVfMode.EnvKey(), spyreconst.ModeEnabledValue)
 				rsList := initManagerAndGetResourceServers(vfConfigFileName)
 				Expect(rsList).Should(HaveLen(1))
 				for _, rs := range rsList {
@@ -198,23 +194,23 @@ var _ = Describe("Manager", Ordered, func() {
 				if runtime.GOARCH != "s390x" {
 					Skip("Isolated VF are only supported on s390x")
 				}
-				_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.DisableVfMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.DisableVfMode.EnvKey())
 			})
 
 			AfterEach(func() {
-				_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
-				_ = os.Unsetenv(spyrev1alpha1.DisableVfMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				os.Unsetenv(spyrev1alpha1.DisableVfMode.EnvKey())
 			})
 
 			DescribeTable("can correctly advertise", func(perDevice bool, topologyAware bool, expectedPoolNames []string) {
 				if perDevice {
-					_ = os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+					os.Setenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				}
 				if topologyAware {
-					_ = os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+					os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				}
 				rsList := initManagerAndGetResourceServers(vfConfigFileName)
 				Expect(rsList).Should(HaveLen(len(expectedPoolNames)))
@@ -254,7 +250,7 @@ var _ = Describe("Manager", Ordered, func() {
 
 	Context("without topology file", func() {
 		BeforeEach(func() {
-			_ = os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
+			os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
 			spyretopo.PciTopology = nil
 			topofile := spyretopo.GetTopologyFile()
 			Expect(topofile).To(BeEquivalentTo(""))
@@ -276,7 +272,7 @@ var _ = Describe("Manager", Ordered, func() {
 		var rm *manager.ResourceManager
 
 		BeforeEach(func() {
-			_ = os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
+			os.Setenv(spyrev1alpha1.ReservationMode.EnvKey(), spyreconst.ModeEnabledValue)
 
 			cp := &manager.CliParams{
 				ConfigFile:     filepath.Join("..", "..", "..", "test", "data", pfConfigFileName),
@@ -300,8 +296,8 @@ var _ = Describe("Manager", Ordered, func() {
 			if rm != nil {
 				rm.StopProbeManager()
 			}
-			_ = os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
-			_ = os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
+			os.Unsetenv(spyrev1alpha1.ReservationMode.EnvKey())
+			os.Unsetenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey())
 		})
 
 		Describe("addNewDevicesToProvider", func() {
@@ -474,7 +470,7 @@ func initManagerAndGetResourceServers(configFileName string) []types.ResourceSer
 	// Reset global topology state to ensure clean test
 	spyretopo.PciTopology = nil
 	if utils.PathExists(spyretopo.DynamicTopologyFilepath) {
-		_ = os.Remove(spyretopo.DynamicTopologyFilepath)
+		os.Remove(spyretopo.DynamicTopologyFilepath)
 	}
 
 	cp := &manager.CliParams{

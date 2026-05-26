@@ -3,12 +3,9 @@
  # | SPDX-License-Identifier: Apache-2.0                               |
  # +-------------------------------------------------------------------+
 
-# Enable automatic Go toolchain management
-export GOTOOLCHAIN = auto
-
 GOLANG_VERSION		?= $(shell cd $(REPO_ROOT) && go list -f {{.GoVersion}} -m)
-BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:$(GOLANG_VERSION)
-GOTOOLCHAIN			?= go$(GOLANG_VERSION)
+BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:9.6-1745588370
+GOTOOLCHAIN			?= go1.24.13
 MAKEFILE_PATH		:= $(abspath $(lastword $(MAKEFILE_LIST)))
 REPO_ROOT 			:= $(abspath $(patsubst %/,%,$(dir $(MAKEFILE_PATH))))
 CURRENT_DIR			:= $(shell pwd)
@@ -60,8 +57,7 @@ CONTROLLER_GEN	?= $(LOCALBIN)/controller-gen
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION 	?= v0.17.3
 ENVTEST_K8S_VERSION			?= 1.31
-GOLANGCI_LINT_VERSION		?= 2.11.4
-GOLANGCI_LINT_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
+GOLANGCI_LINT_VERSION		?= 1.64.8
 GINKGO_VERSION				?= v2.28.1
 YQ_VERSION 					?= v4.29.2
 KIND_VERSION				?= 0.20.0
@@ -73,30 +69,15 @@ DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=det
 
 # Shamesly copied from: https://github.com/opendatahub-io/opendatahub-operator/blob/a08c94a226585e43387ad263e2653c0fd43130f1/Makefile#L132C1-L139C1
 define go-mod-version
-$(shell go list -m -f '{{.Version}}' $(1) 2>/dev/null)
+$(shell go mod graph | grep $(1) 2>/dev/null | head -n 1 | cut -d'@' -f 2)
 endef
 
 # Using controller-gen to fetch external CRDs and put them in config/crd/external folder
 # They're used in tests, as they have to be created for controller to work
 define fetch-external-crds
-	@echo "Fetching external CRDs for $(1) version $(call go-mod-version,$(1))"
-	@mkdir -p config/crd/external
-	@MODULE_VERSION=$$(go list -mod=readonly -m -f '{{.Version}}' $(1) 2>/dev/null); \
-	if [ -z "$$MODULE_VERSION" ]; then \
-		echo "Error: Could not find version for module $(1)"; \
-		exit 1; \
-	fi; \
-	echo "Downloading module $(1) to module cache..."; \
-	go mod download $(1); \
-	MODULE_PATH=$$(go list -mod=readonly -m -f '{{.Dir}}' $(1) 2>/dev/null); \
-	if [ -z "$$MODULE_PATH" ]; then \
-		echo "Error: Could not find path for module $(1) in module cache"; \
-		exit 1; \
-	fi; \
-	echo "Using module path: $$MODULE_PATH/$(2)"; \
-	$(CONTROLLER_GEN) crd \
-		paths=$$MODULE_PATH/$(2)/... \
-		output:crd:artifacts:config=config/crd/external
+GOFLAGS="-mod=readonly" $(CONTROLLER_GEN) crd \
+paths=$(shell go env GOPATH)/pkg/mod/$(1)@$(call go-mod-version,$(1))/$(2)/... \
+output:crd:artifacts:config=config/crd/external
 endef
 
 DOCKER_GO_BUILD_FLAGS ?= -race
@@ -148,14 +129,11 @@ envtest: $(ENVTEST) ## Download and install setup-envtest
 $(ENVTEST):$(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240624150636-162a113134de
 
-
+GOLANGCI_LINT_INSTALL_SCRIPT ?= 'https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh'
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ### Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT):$(LOCALBIN)
-	@if [ ! -s $(GOLANGCI_LINT) ]; then \
-		echo "Building golangci-lint from source with Go $(GOLANG_VERSION)..."; \
-		GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(GOLANGCI_LINT_VERSION); \
-	fi
+	test -s $(GOLANGCI_LINT) || { curl -sSfL $(GOLANGCI_LINT_INSTALL_SCRIPT) | sh -s -- -b $(LOCALBIN)  v$(GOLANGCI_LINT_VERSION); }
 
 .PHONY: kind
 kind: $(KIND) ## Download kind locally if necessary
@@ -238,11 +216,11 @@ build: vendor ## Build local binary
 
 .PHONY: lint
 lint: golangci-lint vendor  ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run --config $(REPO_ROOT)/.golangci.yaml
+	CGO_ENABLED=0 $(GOLANGCI_LINT) run --sort-results --config $(REPO_ROOT)/.golangci.yaml --go $(GOLANG_VERSION)
 
 .PHONY: lint-fix
 lint-fix: golangci-lint vendor ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run --fix --config $(REPO_ROOT)/.golangci.yaml
+	CGO_ENABLED=0 $(GOLANGCI_LINT) run --fix --config $(REPO_ROOT)/.golangci.yaml --go $(GOLANG_VERSION)
 
 .PHONY: vulcheck
 vulcheck: govulncheck ## Scan for golang vulnerabilities
@@ -255,7 +233,6 @@ docker-build: vendor ## Build spyre device plugin image for build host architect
 	$(DOCKER) build $(DOCKER_BUILD_OPTS) --pull \
 	--tag $(IMAGE) \
 	--build-arg VERSION="$(VERSION)" \
-	--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 	--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 	--build-arg BUILD_FLAGS="$(DOCKER_GO_BUILD_FLAGS)" \
 	--file $(DOCKERFILE) $(CURDIR)

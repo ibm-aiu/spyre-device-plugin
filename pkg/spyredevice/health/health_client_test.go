@@ -61,8 +61,8 @@ func generateTestSock() string {
 	f, err := os.CreateTemp("", "unixsock-*")
 	Expect(err).To(BeNil())
 	socketName := f.Name()
-	_ = f.Close()
-	_ = SafeRemove(socketName) // remove file so socket can be created
+	f.Close()
+	SafeRemove(socketName) // remove file so socket can be created
 	return socketName
 }
 
@@ -96,48 +96,11 @@ func NewDummyServer() *DummyServer {
 	return NewDummyServerWithSocket("")
 }
 
-func NewInsecureDummyServer() *DummyServer {
-	return NewInsecureDummyServerWithSocket("")
-}
-
-func NewInsecureDummyServerWithSocket(socketPath string) *DummyServer {
-	if socketPath == "" {
-		socketPath = generateTestSock()
-	}
-	if err := os.Setenv(SpyreHealthSocketEnvKey, socketPath); err != nil {
-		Fail(fmt.Sprintf("Cannot set socket path env: %v", err))
-	}
-	By("Starting insecure dummy server")
-
-	grpcServer := grpc.NewServer()
-	dummyServer := &DummyServer{
-		deviceQueue: make(chan *pb.Devices),
-		quit:        make(chan struct{}),
-		grpcServer:  grpcServer,
-		SocketPath:  socketPath,
-	}
-	pb.RegisterSpyreHealthServiceServer(grpcServer, dummyServer)
-	go func() {
-		lis, err := net.Listen("unix", socketPath)
-		Expect(err).NotTo(HaveOccurred())
-		By(fmt.Sprintf("Listening at %s (insecure)", socketPath))
-		err = grpcServer.Serve(lis)
-		Expect(err).NotTo(HaveOccurred())
-	}()
-	Eventually(func() bool {
-		_, err := os.Stat(socketPath)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond).Should(BeTrue(), "expected file to exist within timeout")
-	return dummyServer
-}
-
 func NewDummyServerWithSocket(socketPath string) *DummyServer {
 	if socketPath == "" {
 		socketPath = generateTestSock()
 	}
-	if err := os.Setenv(SpyreHealthSocketEnvKey, socketPath); err != nil {
-		Fail(fmt.Sprintf("Cannot set socket path env: %v", err))
-	}
+	os.Setenv(SpyreHealthSocketEnvKey, socketPath)
 	By("Starting dummy server")
 
 	tlsCreds, err := loadServerTLSCredentials()
@@ -169,8 +132,8 @@ func (s *DummyServer) Stop() {
 	close(s.quit)
 	s.grpcServer.Stop()
 	close(s.deviceQueue)
-	_ = os.Unsetenv(SpyreHealthSocketEnvKey)
-	_ = SafeRemove(s.SocketPath)
+	os.Unsetenv(SpyreHealthSocketEnvKey)
+	SafeRemove(s.SocketPath)
 }
 
 func (s *DummyServer) RegisterForSpyreDevicesEvents(in *emptypb.Empty,
@@ -200,7 +163,7 @@ func (s *DummyServer) RegisterForSpyreDevicesEventsWithDevices(in *pb.Devices,
 }
 
 func (s *DummyServer) UpdateDeviceState(devs []SimplifiedDevice) {
-	devices := make([]*pb.Device, 0, len(devs))
+	devices := []*pb.Device{}
 	for _, dev := range devs {
 		devices = append(devices, dev.Device())
 	}
@@ -248,7 +211,7 @@ func createDummyTLSCertificates() error {
 	if err != nil {
 		return fmt.Errorf("failed to create cert file: %w", err)
 	}
-	defer func() { _ = certOut.Close() }()
+	defer certOut.Close()
 	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
 		return fmt.Errorf("failed to write cert: %w", err)
 	}
@@ -257,7 +220,7 @@ func createDummyTLSCertificates() error {
 	if err != nil {
 		return fmt.Errorf("failed to create key file: %w", err)
 	}
-	defer func() { _ = keyOut.Close() }()
+	defer keyOut.Close()
 	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes}); err != nil {
 		return fmt.Errorf("failed to write key: %w", err)
@@ -267,13 +230,13 @@ func createDummyTLSCertificates() error {
 }
 
 func cleanupDummyTLSCertificates() {
-	_ = os.RemoveAll("/tmp/certs")
+	os.RemoveAll("/tmp/certs")
 }
 
 var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 	BeforeAll(func() {
-		_ = os.Setenv(TLSCertPathEnvKey, "/tmp/certs/tls.crt")
-		_ = os.Setenv(TLSKeyPathEnvKey, "/tmp/certs/tls.key")
+		os.Setenv(TLSCertPathEnvKey, "/tmp/certs/tls.crt")
+		os.Setenv(TLSKeyPathEnvKey, "/tmp/certs/tls.key")
 
 		if err := createDummyTLSCertificates(); err != nil {
 			Skip(fmt.Sprintf("Cannot create TLS certificates for testing: %v", err))
@@ -282,8 +245,8 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 
 	AfterAll(func() {
 		cleanupDummyTLSCertificates()
-		_ = os.Unsetenv(TLSCertPathEnvKey)
-		_ = os.Unsetenv(TLSKeyPathEnvKey)
+		os.Unsetenv(TLSCertPathEnvKey)
+		os.Unsetenv(TLSKeyPathEnvKey)
 	})
 
 	DescribeTable("MapsEqual", func(a, b map[string]any, expected bool) {
@@ -344,14 +307,14 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 
 		AfterEach(func() {
 			if hasOriginalEnv {
-				_ = os.Setenv(SpyreHealthSocketEnvKey, originalEnvValue)
+				os.Setenv(SpyreHealthSocketEnvKey, originalEnvValue)
 			} else {
-				_ = os.Unsetenv(SpyreHealthSocketEnvKey)
+				os.Unsetenv(SpyreHealthSocketEnvKey)
 			}
 		})
 
 		It("should return error when environment variable is unset", func() {
-			_ = os.Unsetenv(SpyreHealthSocketEnvKey)
+			os.Unsetenv(SpyreHealthSocketEnvKey)
 			_, err := SpyreHealthSocket()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("is unset"))
@@ -359,7 +322,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 
 		It("should return error when socket file does not exist", func() {
 			nonExistentSocket := "/tmp/nonexistent-socket-" + time.Now().Format("20060102150405")
-			_ = os.Setenv(SpyreHealthSocketEnvKey, nonExistentSocket)
+			os.Setenv(SpyreHealthSocketEnvKey, nonExistentSocket)
 			_, err := SpyreHealthSocket()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unix socket is unavailable"))
@@ -369,10 +332,10 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			tmpFile, err := os.CreateTemp("", "not-a-socket-*")
 			Expect(err).NotTo(HaveOccurred())
 			tmpPath := tmpFile.Name()
-			_ = tmpFile.Close()
-			defer func() { _ = SafeRemove(tmpPath) }()
+			tmpFile.Close()
+			defer SafeRemove(tmpPath)
 
-			_ = os.Setenv(SpyreHealthSocketEnvKey, tmpPath)
+			os.Setenv(SpyreHealthSocketEnvKey, tmpPath)
 			_, err = SpyreHealthSocket()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("is not a unix socket"))
@@ -383,10 +346,10 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			socketPath := generateTestSock()
 			lis, err := net.Listen("unix", socketPath)
 			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = lis.Close() }()
-			defer func() { _ = SafeRemove(socketPath) }()
+			defer lis.Close()
+			defer SafeRemove(socketPath)
 
-			_ = os.Setenv(SpyreHealthSocketEnvKey, socketPath)
+			os.Setenv(SpyreHealthSocketEnvKey, socketPath)
 			result, err := SpyreHealthSocket()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal("unix://" + socketPath))
@@ -396,18 +359,18 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			socketPath := generateTestSock()
 			lis, err := net.Listen("unix", socketPath)
 			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = lis.Close() }()
-			defer func() { _ = SafeRemove(socketPath) }()
+			defer lis.Close()
+			defer SafeRemove(socketPath)
 
 			socketDir := filepath.Dir(socketPath)
 			socketName := filepath.Base(socketPath)
 			originalDir, err := os.Getwd()
 			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = os.Chdir(originalDir) }()
+			defer os.Chdir(originalDir)
 
 			err = os.Chdir(socketDir)
 			Expect(err).NotTo(HaveOccurred())
-			_ = os.Setenv(SpyreHealthSocketEnvKey, socketName)
+			os.Setenv(SpyreHealthSocketEnvKey, socketName)
 			result, err := SpyreHealthSocket()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal("unix:" + socketName))
@@ -425,14 +388,14 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 
 		AfterEach(func() {
 			if hasCertPath {
-				_ = os.Setenv(TLSCertPathEnvKey, originalCertPath)
+				os.Setenv(TLSCertPathEnvKey, originalCertPath)
 			} else {
-				_ = os.Unsetenv(TLSCertPathEnvKey)
+				os.Unsetenv(TLSCertPathEnvKey)
 			}
 			if hasKeyPath {
-				_ = os.Setenv(TLSKeyPathEnvKey, originalKeyPath)
+				os.Setenv(TLSKeyPathEnvKey, originalKeyPath)
 			} else {
-				_ = os.Unsetenv(TLSKeyPathEnvKey)
+				os.Unsetenv(TLSKeyPathEnvKey)
 			}
 		})
 
@@ -443,8 +406,8 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 		})
 
 		It("should return error when certificate file does not exist", func() {
-			_ = os.Setenv(TLSCertPathEnvKey, "/tmp/nonexistent-cert.crt")
-			_ = os.Setenv(TLSKeyPathEnvKey, "/tmp/nonexistent-key.key")
+			os.Setenv(TLSCertPathEnvKey, "/tmp/nonexistent-cert.crt")
+			os.Setenv(TLSKeyPathEnvKey, "/tmp/nonexistent-key.key")
 
 			_, err := LoadTLSCredentials()
 			Expect(err).To(HaveOccurred())
@@ -454,7 +417,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 		It("should return error when certificate file is invalid", func() {
 			tmpDir, err := os.MkdirTemp("", "invalid-certs-*")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = os.RemoveAll(tmpDir) }()
+			defer os.RemoveAll(tmpDir)
 
 			invalidCertPath := filepath.Join(tmpDir, "invalid.crt")
 			invalidKeyPath := filepath.Join(tmpDir, "invalid.key")
@@ -463,8 +426,8 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			err = os.WriteFile(invalidKeyPath, []byte("invalid key"), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
-			_ = os.Setenv(TLSCertPathEnvKey, invalidCertPath)
-			_ = os.Setenv(TLSKeyPathEnvKey, invalidKeyPath)
+			os.Setenv(TLSCertPathEnvKey, invalidCertPath)
+			os.Setenv(TLSKeyPathEnvKey, invalidKeyPath)
 
 			_, err = LoadTLSCredentials()
 			Expect(err).To(HaveOccurred())
@@ -472,8 +435,8 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 		})
 
 		It("should use default paths when environment variables are not set", func() {
-			_ = os.Unsetenv(TLSCertPathEnvKey)
-			_ = os.Unsetenv(TLSKeyPathEnvKey)
+			os.Unsetenv(TLSCertPathEnvKey)
+			os.Unsetenv(TLSKeyPathEnvKey)
 
 			_, err := LoadTLSCredentials()
 			Expect(err).To(HaveOccurred())
@@ -765,7 +728,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 			By("Stopping server and removing socket")
 			socketPath := dummyServer.SocketPath
 			dummyServer.Stop()
-			_ = SafeRemove(socketPath)
+			SafeRemove(socketPath)
 
 			// Wait for client to detect disconnection and fail to reconnect
 			Eventually(func() bool {

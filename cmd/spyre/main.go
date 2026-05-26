@@ -81,8 +81,7 @@ func main() {
 	rm := manager.NewResourceManager(cp, spyreClient)
 
 	var podWatcher *server.PodWatcher
-	if podWatcher, err = server.NewPodWatcher(
-		cfg, rm.GetAllocateCh(), rm.GetMountedCh(), rm.GetDeallocateCh()); err != nil {
+	if podWatcher, err = server.NewPodWatcher(cfg, rm.GetAllocateCh(), rm.GetMountedCh(), rm.GetDeallocateCh()); err != nil {
 		glog.Errorf("error creating deallocator %v", err)
 		return
 	}

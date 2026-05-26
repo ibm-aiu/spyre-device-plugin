@@ -30,8 +30,7 @@ func (rm *ResourceManager) ExportConfigList() []*types.ResourceConfig {
 	return rm.configList
 }
 
-func (rm *ResourceManager) TestHandleHotpluggedDevices(
-	ctx context.Context, cfg *rest.Config, spyreClient *spyreclient.SpyreClient, newDevices []types.PciDevice) {
+func (rm *ResourceManager) TestHandleHotpluggedDevices(ctx context.Context, cfg *rest.Config, spyreClient *spyreclient.SpyreClient, newDevices []types.PciDevice) {
 	rm.HandleHotpluggedDevices(ctx, cfg, spyreClient, newDevices)
 }
 
@@ -60,7 +59,6 @@ func ExportFilterDevicesByPCIAddr(devices []types.PciDevice, addr string) []type
 }
 
 // ExportNewResourceManagerWithConfig exposes NewResourceManagerWithConfig for testing
-func ExportNewResourceManagerWithConfig(
-	cp *CliParams, spyreClient *spyreclient.SpyreClient, cfg *rest.Config) *ResourceManager {
+func ExportNewResourceManagerWithConfig(cp *CliParams, spyreClient *spyreclient.SpyreClient, cfg *rest.Config) *ResourceManager {
 	return NewResourceManagerWithConfig(cp, spyreClient, cfg)
 }

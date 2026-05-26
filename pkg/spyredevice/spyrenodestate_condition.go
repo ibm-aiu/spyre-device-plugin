@@ -37,10 +37,7 @@ type SpyreNodeStateHealthCondition struct {
 	unhealthyDevices []spyrev1alpha1.UnhealthyDevice
 }
 
-func NewSpyreNodeStateHealthCondition(
-	hasDevice bool,
-	unhealthyDevices []spyrev1alpha1.UnhealthyDevice,
-) *SpyreNodeStateHealthCondition {
+func NewSpyreNodeStateHealthCondition(hasDevice bool, unhealthyDevices []spyrev1alpha1.UnhealthyDevice) *SpyreNodeStateHealthCondition {
 	return &SpyreNodeStateHealthCondition{
 		unhealthyDevices: unhealthyDevices,
 		hasDevice:        hasDevice,

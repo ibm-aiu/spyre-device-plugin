@@ -29,10 +29,6 @@ import (
 	spyreclient "github.com/ibm-aiu/spyre-operator/pkg/client"
 )
 
-const (
-	linuxOS = "linux"
-)
-
 var NodeNameEnvKey = utils.NodeNameEnvKey
 var healthyDeviceState = *NewDeviceHealthState(pb.DEVICE_TYPE_PF)
 var unhealthyDeviceState = *NewUnhealthyDeviceState(pb.DEVICE_TYPE_PF, pb.DEVICE_STATE_IN_ERROR)
@@ -53,7 +49,7 @@ func createUnhealthtyTestPciDevice(pciAddr string, productID string) types.PciDe
 }
 
 func init() {
-	_ = os.Setenv(NodeNameEnvKey, testNodeName)
+	os.Setenv(NodeNameEnvKey, testNodeName)
 	originalPCIDevicesPath = PCIDevicesPath
 }
 
@@ -71,7 +67,7 @@ var _ = Describe("PCI Device Utilities", func() {
 	})
 
 	AfterEach(func() {
-		_ = os.RemoveAll(tempDir)
+		os.RemoveAll(tempDir)
 		SetPCIDevicesPath(originalPCIDevicesPath)
 	})
 
@@ -94,7 +90,7 @@ var _ = Describe("PCI Device Utilities", func() {
 		})
 
 		It("should handle RediscoverDevices with no devices", func() {
-			if runtime.GOOS != linuxOS {
+			if runtime.GOOS != "linux" {
 				Skip("This test requires Linux")
 			}
 			createDevicePath("0001:00:00.0")
@@ -104,7 +100,7 @@ var _ = Describe("PCI Device Utilities", func() {
 		})
 
 		It("should handle RediscoverDevices with empty directory", func() {
-			if runtime.GOOS != linuxOS {
+			if runtime.GOOS != "linux" {
 				Skip("This test requires Linux")
 			}
 			err := handler.RediscoverDevices()
@@ -166,7 +162,7 @@ var _ = Describe("PCI Device Utilities", func() {
 
 	Describe("Device info helpers", func() {
 		It("should get device info correctly", func() {
-			if runtime.GOOS != linuxOS {
+			if runtime.GOOS != "linux" {
 				Skip("This test requires Linux")
 			}
 			handler := NewTestHealthInfoHandler()
@@ -249,10 +245,10 @@ var _ = Describe("PCI Device Utilities", func() {
 		})
 
 		It("should start and stop monitoring correctly", func() {
-			if runtime.GOOS != linuxOS {
+			if runtime.GOOS != "linux" {
 				Skip("This test requires Linux")
 			}
-			_ = handler.Start(ctx, []types.PciDevice{})
+			handler.Start(ctx, []types.PciDevice{})
 			time.Sleep(200 * time.Millisecond)
 			handler.Stop()
 			_, ok := <-handler.StopChan()
@@ -428,10 +424,7 @@ var _ = Describe("Device type identification", func() {
 				Expect(uniqueDevices).To(BeEmpty())
 				return
 			}
-			Expect(uniqueDevices).To(
-				HaveLen(len(expectedHealthy)),
-				fmt.Sprintf("expect %d results, got %v", len(expectedHealthy), uniqueDevices),
-			)
+			Expect(uniqueDevices).To(HaveLen(len(expectedHealthy)), fmt.Sprintf("expect %d results, got %v", len(expectedHealthy), uniqueDevices))
 			healthyNum := 0
 			for addr, device := range uniqueDevices {
 				expected, found := expectedHealthy[addr]
@@ -545,14 +538,7 @@ var _ = Describe("Device type identification", func() {
 			healthInfoMap map[string]DeviceHealthState, expectedNewDevices []string, expectedChange bool) {
 			newDevices, changed := handler.IdentifyDeviceChanges(devices, existing, healthInfoMap)
 			Expect(changed).To(Equal(expectedChange))
-			Expect(newDevices).To(
-				HaveLen(len(expectedNewDevices)),
-				fmt.Sprintf(
-					"expect %d results, got %v",
-					len(expectedNewDevices),
-					newDevices,
-				),
-			)
+			Expect(newDevices).To(HaveLen(len(expectedNewDevices)), fmt.Sprintf("expect %d results, got %v", len(expectedNewDevices), newDevices))
 			for _, device := range newDevices {
 				Expect(expectedNewDevices).To(ContainElement(device.GetPciAddr()))
 			}
