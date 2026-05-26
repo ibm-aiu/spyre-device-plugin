@@ -95,7 +95,8 @@ var _ = Describe("SpyreNodeStates", func() {
 			Spec: nsSpec,
 		}
 		spyreInterfaceMap, spyreSSAInterfaceMap := getSpyreInterfaceMaps(pciDevices)
-		specChanged, statusChanged := updateSpyreInterfacesChanges(ns, spyreInterfaceMap, spyreSSAInterfaceMap, unhealthyDevices)
+		specChanged, statusChanged := updateSpyreInterfacesChanges(ns, spyreInterfaceMap,
+			spyreSSAInterfaceMap, unhealthyDevices)
 		Expect(specChanged).To(Equal(expectedChange))
 		// check spec
 		Expect(ns.Spec.SpyreInterfaces).To(HaveLen(expectedSpyreInterfaces))
@@ -195,33 +196,36 @@ var _ = Describe("SpyreNodeStates", func() {
 	},
 		// topo.Version == 0 -> cannot sync (still returns whatever changed is)
 		Entry("topo version 0 with different Pcitopo", 0.0, "", true),
-		Entry("topo version 0 with same Pcitopo", 0.0, pcitopov2.Pcitopo{Devices: map[string]pcitopov2.Device{"00": {}}, Version: 0}.String(), false),
-
+		Entry("topo version 0 with same Pcitopo", 0.0,
+			pcitopov2.Pcitopo{Devices: map[string]pcitopov2.Device{"00": {}}, Version: 0}.String(), false),
 		// topo.Version > 0, expect changed when Pcitopo differs
 		Entry("valid topo different from nodeState", 2.0, "", true),
-		Entry("valid topo same as nodeState", 2.0, pcitopov2.Pcitopo{Devices: map[string]pcitopov2.Device{"00": {}}, Version: 2}.String(), false),
+		Entry("valid topo same as nodeState", 2.0,
+			pcitopov2.Pcitopo{Devices: map[string]pcitopov2.Device{"00": {}}, Version: 2}.String(), false),
 	)
-	DescribeTable("updateSpyreInterfacesWithTopo with SpyreVfDevices(Isolated VF)", func(topoVersion float64, nsTopo string, expectedChange bool) {
-		// create topo with SpyreVfDevices
-		topo := pcitopov2.Pcitopo{
-			Devices:        map[string]pcitopov2.Device{},
-			SpyreVfDevices: map[string]pcitopov2.Device{"02": {}},
-			Version:        float32(topoVersion),
-		}
-		newTopo := topo.String()
+	DescribeTable(
+		"updateSpyreInterfacesWithTopo with SpyreVfDevices(Isolated VF)",
+		func(topoVersion float64, nsTopo string, expectedChange bool) {
+			// create topo with SpyreVfDevices
+			topo := pcitopov2.Pcitopo{
+				Devices:        map[string]pcitopov2.Device{},
+				SpyreVfDevices: map[string]pcitopov2.Device{"02": {}},
+				Version:        float32(topoVersion),
+			}
+			newTopo := topo.String()
 
-		// create nodeState
-		ns := &spyrev1alpha1.SpyreNodeState{
-			Spec: spyrev1alpha1.SpyreNodeStateSpec{
-				Pcitopo: nsTopo,
-			},
-		}
+			// create nodeState
+			ns := &spyrev1alpha1.SpyreNodeState{
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					Pcitopo: nsTopo,
+				},
+			}
 
-		changed := updateSpyreInterfacesWithTopo(topo, ns, false)
+			changed := updateSpyreInterfacesWithTopo(topo, ns, false)
 
-		Expect(changed).To(Equal(expectedChange))
-		Expect(ns.Spec.Pcitopo).To(Equal(newTopo))
-	},
+			Expect(changed).To(Equal(expectedChange))
+			Expect(ns.Spec.Pcitopo).To(Equal(newTopo))
+		},
 		Entry("topo version 2, nodeState empty", 2.0, "", true),
 		Entry("topo version 2, nodeState same as topo", 2.0, pcitopov2.Pcitopo{
 			Devices:        map[string]pcitopov2.Device{},
@@ -231,22 +235,24 @@ var _ = Describe("SpyreNodeStates", func() {
 		Entry("topo version 0, nodeState different", 0.0, "", true),
 	)
 
-	DescribeTable("updateSpyreInterfacesWithTopo with initial change flag", func(initialChanged bool, topoVersion float64, nsTopo string, expectedChange bool) {
-		topo := pcitopov2.Pcitopo{
-			Devices:        map[string]pcitopov2.Device{"01": {}},
-			SpyreVfDevices: map[string]pcitopov2.Device{"02": {}},
-			Version:        float32(topoVersion),
-		}
-		newTopo := topo.String()
-		ns := &spyrev1alpha1.SpyreNodeState{
-			Spec: spyrev1alpha1.SpyreNodeStateSpec{
-				Pcitopo: nsTopo,
-			},
-		}
-		changed := updateSpyreInterfacesWithTopo(topo, ns, initialChanged)
-		Expect(changed).To(Equal(expectedChange))
-		Expect(ns.Spec.Pcitopo).To(Equal(newTopo))
-	},
+	DescribeTable(
+		"updateSpyreInterfacesWithTopo with initial change flag",
+		func(initialChanged bool, topoVersion float64, nsTopo string, expectedChange bool) {
+			topo := pcitopov2.Pcitopo{
+				Devices:        map[string]pcitopov2.Device{"01": {}},
+				SpyreVfDevices: map[string]pcitopov2.Device{"02": {}},
+				Version:        float32(topoVersion),
+			}
+			newTopo := topo.String()
+			ns := &spyrev1alpha1.SpyreNodeState{
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					Pcitopo: nsTopo,
+				},
+			}
+			changed := updateSpyreInterfacesWithTopo(topo, ns, initialChanged)
+			Expect(changed).To(Equal(expectedChange))
+			Expect(ns.Spec.Pcitopo).To(Equal(newTopo))
+		},
 		Entry("initial changed=true, topo different, version>0", true, 2.0, "", true),
 		Entry("initial changed=true, topo same, version>0", true, 2.0, pcitopov2.Pcitopo{
 			Devices:        map[string]pcitopov2.Device{"01": {}},
@@ -261,24 +267,30 @@ var _ = Describe("SpyreNodeStates", func() {
 		}.String(), true),
 	)
 
-	DescribeTable("updateSpyreInterfacesWithTopo with complex device configurations", func(topoVersion float64, oldTopoDevices, newTopoDevices map[string]pcitopov2.Device, expectedChange bool) {
-		oldTopo := pcitopov2.Pcitopo{
-			Devices: oldTopoDevices,
-			Version: float32(topoVersion),
-		}
-		newTopo := pcitopov2.Pcitopo{
-			Devices: newTopoDevices,
-			Version: float32(topoVersion),
-		}
-		ns := &spyrev1alpha1.SpyreNodeState{
-			Spec: spyrev1alpha1.SpyreNodeStateSpec{
-				Pcitopo: oldTopo.String(),
-			},
-		}
-		changed := updateSpyreInterfacesWithTopo(newTopo, ns, false)
-		Expect(changed).To(Equal(expectedChange))
-		Expect(ns.Spec.Pcitopo).To(Equal(newTopo.String()))
-	},
+	DescribeTable(
+		"updateSpyreInterfacesWithTopo with complex device configurations",
+		func(
+			topoVersion float64,
+			oldTopoDevices, newTopoDevices map[string]pcitopov2.Device,
+			expectedChange bool,
+		) {
+			oldTopo := pcitopov2.Pcitopo{
+				Devices: oldTopoDevices,
+				Version: float32(topoVersion),
+			}
+			newTopo := pcitopov2.Pcitopo{
+				Devices: newTopoDevices,
+				Version: float32(topoVersion),
+			}
+			ns := &spyrev1alpha1.SpyreNodeState{
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					Pcitopo: oldTopo.String(),
+				},
+			}
+			changed := updateSpyreInterfacesWithTopo(newTopo, ns, false)
+			Expect(changed).To(Equal(expectedChange))
+			Expect(ns.Spec.Pcitopo).To(Equal(newTopo.String()))
+		},
 		Entry("Same device set", 2.0,
 			map[string]pcitopov2.Device{"01": {}, "02": {}},
 			map[string]pcitopov2.Device{"01": {}, "02": {}},
@@ -301,26 +313,27 @@ var _ = Describe("SpyreNodeStates", func() {
 			true),
 	)
 
-	DescribeTable("updateSpyreInterfacesWithTopo with device attribute changes", func(topoVersion float64, expectedChange bool) {
-		device1 := pcitopov2.Device{}
-		device2 := pcitopov2.Device{}
-		oldTopo := pcitopov2.Pcitopo{
-			Devices: map[string]pcitopov2.Device{"01": device1},
-			Version: float32(topoVersion),
-		}
-		newTopo := pcitopov2.Pcitopo{
-			Devices: map[string]pcitopov2.Device{"01": device2, "02": device2},
-			Version: float32(topoVersion),
-		}
-		ns := &spyrev1alpha1.SpyreNodeState{
-			Spec: spyrev1alpha1.SpyreNodeStateSpec{
-				Pcitopo: oldTopo.String(),
-			},
-		}
-		changed := updateSpyreInterfacesWithTopo(newTopo, ns, false)
-		Expect(changed).To(Equal(expectedChange))
-		Expect(ns.Spec.Pcitopo).To(Equal(newTopo.String()))
-	},
+	DescribeTable("updateSpyreInterfacesWithTopo with device attribute changes",
+		func(topoVersion float64, expectedChange bool) {
+			device1 := pcitopov2.Device{}
+			device2 := pcitopov2.Device{}
+			oldTopo := pcitopov2.Pcitopo{
+				Devices: map[string]pcitopov2.Device{"01": device1},
+				Version: float32(topoVersion),
+			}
+			newTopo := pcitopov2.Pcitopo{
+				Devices: map[string]pcitopov2.Device{"01": device2, "02": device2},
+				Version: float32(topoVersion),
+			}
+			ns := &spyrev1alpha1.SpyreNodeState{
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					Pcitopo: oldTopo.String(),
+				},
+			}
+			changed := updateSpyreInterfacesWithTopo(newTopo, ns, false)
+			Expect(changed).To(Equal(expectedChange))
+			Expect(ns.Spec.Pcitopo).To(Equal(newTopo.String()))
+		},
 		Entry("Device property changed with version>0", 2.0, true),
 		Entry("Device property changed with version=0", 0.0, true),
 	)
@@ -337,14 +350,14 @@ var _ = Describe("SpyreNodeStates", func() {
 
 		AfterEach(func() {
 			if pseudoModeSet {
-				os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), originalPseudoMode)
+				_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), originalPseudoMode)
 			} else {
-				os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+				_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			}
 		})
 
 		It("should skip health filtering in pseudo mode", func() {
-			os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), "1")
+			_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), "1")
 			allDevices := map[string]pcitopov2.Device{
 				"0001:00:00.0": {DeviceId: "06a8", Name: "Device 1"},
 				"0002:00:00.0": {DeviceId: "06a8", Name: "Device 2"},
@@ -370,7 +383,7 @@ var _ = Describe("SpyreNodeStates", func() {
 		})
 
 		It("should apply health filtering in non-pseudo mode", func() {
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			allDevices := map[string]pcitopov2.Device{
 				"0001:00:00.0": {DeviceId: "06a8", Name: "Device 1"},
 				"0002:00:00.0": {DeviceId: "06a8", Name: "Device 2"},
@@ -403,7 +416,7 @@ var _ = Describe("SpyreNodeStates", func() {
 		})
 
 		It("should handle all devices unhealthy in non-pseudo mode", func() {
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 
 			allDevices := map[string]pcitopov2.Device{
 				"0001:00:00.0": {DeviceId: "06a8"},
@@ -426,7 +439,7 @@ var _ = Describe("SpyreNodeStates", func() {
 		})
 
 		It("should handle all devices healthy in non-pseudo mode", func() {
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 
 			allDevices := map[string]pcitopov2.Device{
 				"0001:00:00.0": {DeviceId: "06a8"},
@@ -594,14 +607,14 @@ var _ = Describe("SpyreNodeStates", func() {
 
 		AfterEach(func() {
 			if pseudoModeSet {
-				os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), originalPseudoMode)
+				_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), originalPseudoMode)
 			} else {
-				os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+				_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			}
 		})
 
 		It("should update topology in pseudo mode without health filtering", func() {
-			os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), "1")
+			_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), "1")
 
 			topo := pcitopov2.Pcitopo{
 				Devices: map[string]pcitopov2.Device{
@@ -626,7 +639,7 @@ var _ = Describe("SpyreNodeStates", func() {
 		})
 
 		It("should apply health filtering in non-pseudo mode", func() {
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 
 			originalTopo := pcitopov2.Pcitopo{
 				Devices: map[string]pcitopov2.Device{

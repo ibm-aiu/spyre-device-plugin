@@ -41,6 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
+const (
+	node1Name = "node1"
+	node2Name = "node2"
+)
+
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -57,13 +62,13 @@ func createNewNamespace(ctx context.Context) string {
 
 var _ = Describe("Spyre State Updater", func() {
 
-	os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+	_ = os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 	ctx := context.Background()
 
 	Context("Custom kube client for SpyreNodeState and SpyreClusterPolicy", func() {
 		var spyreClient *spyreclient.SpyreClient
 		var err error
-		nodeList := []string{"node1", "node2"}
+		nodeList := []string{node1Name, node2Name}
 
 		Context("general CRUD functions", func() {
 
@@ -198,7 +203,7 @@ var _ = Describe("Spyre State Updater", func() {
 			})
 
 			It("can add a device to the spec of a SpyreNodeState resources", func() {
-				os.Setenv(spyredevice.NodeNameEnvKey, "node2")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node2Name)
 				device := spyredevice.GeneratePseudoDevice("0000:99:00.0", resources.PfProductId)
 				pciDevice := spyredevice.NewPseudoPciDevice(device)
 				devices := []types.PciDevice{
@@ -206,15 +211,15 @@ var _ = Describe("Spyre State Updater", func() {
 				}
 				nodeState, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
-				Expect(nodeState.Spec.NodeName).Should(Equal("node2"))
+				Expect(nodeState.Spec.NodeName).Should(Equal(node2Name))
 				nsList, err := spyreClient.List(ctx, &client.ListOptions{})
 				Expect(err).To(BeNil())
 				for _, nodeState := range nsList.Items {
 					switch nodeState.Spec.NodeName {
-					case "node1":
+					case node1Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
-					case "node2":
+					case node2Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(2))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
 						Expect(nodeState.Spec.SpyreInterfaces[1].PciAddress).Should(Equal("0000:99:00.0"))
@@ -223,7 +228,7 @@ var _ = Describe("Spyre State Updater", func() {
 			})
 
 			It("can add a vf device to the spec of SpyreNodeState resources", func() {
-				os.Setenv(spyredevice.NodeNameEnvKey, "node1")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node1Name)
 				deviceVf0 := spyredevice.GeneratePseudoDevice("0000:01:00.1", resources.VfProductId)
 				deviceVf1 := spyredevice.GeneratePseudoDevice("0000:01:00.2", resources.VfProductId)
 				pciDeviceVf0 := spyredevice.NewPseudoPciDevice(deviceVf0)
@@ -233,9 +238,9 @@ var _ = Describe("Spyre State Updater", func() {
 				}
 				_, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
-				nodeState, err := spyreClient.Get(ctx, "node1")
+				nodeState, err := spyreClient.Get(ctx, node1Name)
 				Expect(err).To(BeNil())
-				Expect(nodeState.Spec.NodeName).Should(Equal("node1"))
+				Expect(nodeState.Spec.NodeName).Should(Equal(node1Name))
 				Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1))
 				Expect(nodeState.Spec.SpyreInterfaces[0].NumVfs).Should(Equal(2))
 				Expect(len(nodeState.Spec.SpyreInterfaces[0].Vfs)).Should(Equal(2))
@@ -250,19 +255,20 @@ var _ = Describe("Spyre State Updater", func() {
 				devices := []types.PciDevice{
 					pciDevice,
 				}
-				os.Setenv(spyredevice.NodeNameEnvKey, "node2")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node2Name)
 				nodeState, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
-				Expect(nodeState.Spec.NodeName).Should(Equal("node2"))
+				Expect(nodeState.Spec.NodeName).Should(Equal(node2Name))
 				nsList, err := spyreClient.List(ctx, &client.ListOptions{})
 				Expect(err).To(BeNil())
 				for _, nodeState := range nsList.Items {
 					switch nodeState.Spec.NodeName {
-					case "node1":
+					case node1Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
-					case "node2":
-						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1), fmt.Sprintf("interfaces: %v", nodeState.Spec.SpyreInterfaces))
+					case node2Name:
+						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1),
+							fmt.Sprintf("interfaces: %v", nodeState.Spec.SpyreInterfaces))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
 					}
 				}
@@ -301,16 +307,16 @@ var _ = Describe("Spyre State Updater", func() {
 			pf01pciDevice := spyredevice.NewPseudoPciDevice(pf01)
 			vf01pciDevice := spyredevice.NewPseudoPciDevice(vf01)
 			node2ValidCheck := func(nodeState *spyrev1alpha1.SpyreNodeState, expectedVfs []string) {
-				Expect(nodeState.Spec.NodeName).Should(Equal("node2"))
+				Expect(nodeState.Spec.NodeName).Should(Equal(node2Name))
 				nsList, err := spyreClient.List(ctx, &client.ListOptions{})
 				Expect(err).To(BeNil())
 				for _, nodeState := range nsList.Items {
 					switch nodeState.Spec.NodeName {
-					case "node1":
+					case node1Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
 						Expect(nodeState.Spec.SpyreInterfaces[0].NumVfs).Should(Equal(0))
-					case "node2":
+					case node2Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(2))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
 						Expect(nodeState.Spec.SpyreInterfaces[0].NumVfs).Should(Equal(0))
@@ -326,7 +332,7 @@ var _ = Describe("Spyre State Updater", func() {
 				devices := []types.PciDevice{
 					pf99pciDevice, vf99pciDevice,
 				}
-				os.Setenv(spyredevice.NodeNameEnvKey, "node2")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node2Name)
 				nodeState, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
 				node2ValidCheck(nodeState, singleExpectedVfs)
@@ -336,7 +342,7 @@ var _ = Describe("Spyre State Updater", func() {
 				devices := []types.PciDevice{
 					vf99pciDevice,
 				}
-				os.Setenv(spyredevice.NodeNameEnvKey, "node2")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node2Name)
 				nodeState, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
 				node2ValidCheck(nodeState, singleExpectedVfs)
@@ -345,19 +351,19 @@ var _ = Describe("Spyre State Updater", func() {
 				devices := []types.PciDevice{
 					vf01pciDevice, pf01pciDevice,
 				}
-				os.Setenv(spyredevice.NodeNameEnvKey, "node2")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node2Name)
 				nodeState, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
-				Expect(nodeState.Spec.NodeName).Should(Equal("node2"))
+				Expect(nodeState.Spec.NodeName).Should(Equal(node2Name))
 				nsList, err := spyreClient.List(ctx, &client.ListOptions{})
 				Expect(err).To(BeNil())
 				for _, nodeState := range nsList.Items {
 					switch nodeState.Spec.NodeName {
-					case "node1":
+					case node1Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
 						Expect(nodeState.Spec.SpyreInterfaces[0].NumVfs).Should(Equal(0))
-					case "node2":
+					case node2Name:
 						Expect(len(nodeState.Spec.SpyreInterfaces)).Should(Equal(1))
 						Expect(nodeState.Spec.SpyreInterfaces[0].PciAddress).Should(Equal("0000:01:00.0"))
 						Expect(nodeState.Spec.SpyreInterfaces[0].NumVfs).Should(Equal(1))
@@ -369,7 +375,7 @@ var _ = Describe("Spyre State Updater", func() {
 				devices := []types.PciDevice{
 					vf99pciDevice, vf99pciDevice_2,
 				}
-				os.Setenv(spyredevice.NodeNameEnvKey, "node2")
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node2Name)
 				nodeState, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, devices, spyreClient, false, nil)
 				Expect(err).To(BeNil())
 				node2ValidCheck(nodeState, twoExpectedVfs)
@@ -516,7 +522,9 @@ var _ = Describe("Spyre State Updater", func() {
 				Expect(nodeState.Name).Should(Equal("testnodestate"))
 
 				// add first one
-				nodeState.Status.Reservations = map[string]spyrev1alpha1.Reservation{"spyre_pf": {DeviceSets: [][]string{{"0000:99:00.0"}}}}
+				nodeState.Status.Reservations = map[string]spyrev1alpha1.Reservation{
+					"spyre_pf": {DeviceSets: [][]string{{"0000:99:00.0"}}},
+				}
 				_, err = spyreClient.UpdateStatus(ctx, nodeState, false)
 				Expect(err).To(BeNil())
 				nodeState, err = spyreClient.Get(ctx, "testnodestate")
@@ -680,8 +688,8 @@ var _ = Describe("Spyre State Updater", func() {
 			})
 
 			It("should update topology in pseudo mode without health filtering", func() {
-				os.Setenv(spyredevice.NodeNameEnvKey, "node1")
-				os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node1Name)
+				_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
 
 				device := spyredevice.GeneratePseudoDevice("0000:29:00.0", resources.PfProductId)
 				pciDevice := spyredevice.NewPseudoPciDevice(device)
@@ -694,12 +702,12 @@ var _ = Describe("Spyre State Updater", func() {
 				// Verify topology was updated
 				Expect(nodeState.Spec.Pcitopo).NotTo(BeEmpty())
 
-				os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+				_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			})
 
 			It("should apply health filtering in non-pseudo mode", func() {
-				os.Setenv(spyredevice.NodeNameEnvKey, "node1")
-				os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node1Name)
+				_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 
 				device1 := spyredevice.GeneratePseudoDevice("0000:29:00.0", resources.PfProductId)
 				pciDevice1 := spyredevice.NewPseudoPciDevice(device1)
@@ -718,11 +726,11 @@ var _ = Describe("Spyre State Updater", func() {
 			})
 
 			It("should clear topology when GetPciTopology fails and Pcitopo exists", func() {
-				os.Setenv(spyredevice.NodeNameEnvKey, "node1")
-				os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+				_ = os.Setenv(spyredevice.NodeNameEnvKey, node1Name)
+				_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 
 				// First, set up a node state with existing topology
-				nodeState, err := spyreClient.Get(ctx, "node1")
+				nodeState, err := spyreClient.Get(ctx, node1Name)
 				Expect(err).To(BeNil())
 				nodeState.Spec.Pcitopo = `{"devices": {"0000:01:00.0": {}}, "version": 2.0}`
 				_, err = spyreClient.Update(ctx, nodeState, false)
@@ -730,11 +738,11 @@ var _ = Describe("Spyre State Updater", func() {
 
 				// Set PciTopology to nil and ensure metadata file is ignored
 				spyretopo.PciTopology = nil
-				os.Setenv(spyretopo.IgnoreMetadataKey, "true")
+				_ = os.Setenv(spyretopo.IgnoreMetadataKey, "true")
 
 				// Clear any dynamic topology file
 				if utils.PathExists(spyretopo.DynamicTopologyFilepath) {
-					os.Remove(spyretopo.DynamicTopologyFilepath)
+					_ = os.Remove(spyretopo.DynamicTopologyFilepath)
 				}
 
 				device := spyredevice.GeneratePseudoDevice("0000:99:00.0", resources.PfProductId)
@@ -747,7 +755,7 @@ var _ = Describe("Spyre State Updater", func() {
 				// When GetPciTopology fails and Pcitopo was not empty, it should be cleared
 				Expect(nodeState.Spec.Pcitopo).To(Equal(""))
 
-				os.Unsetenv(spyretopo.IgnoreMetadataKey)
+				_ = os.Unsetenv(spyretopo.IgnoreMetadataKey)
 			})
 		})
 
@@ -810,8 +818,8 @@ var _ = Describe("Spyre State Updater", func() {
 
 		BeforeEach(func() {
 			namespace = createNewNamespace(ctx)
-			node = "node1"
-			os.Setenv(spyredevice.NodeNameEnvKey, node)
+			node = node1Name
+			_ = os.Setenv(spyredevice.NodeNameEnvKey, node)
 			spyreClient, err = spyreclient.NewClient(context.Background(), cfg)
 			Expect(err).To(BeNil())
 			Expect(spyreClient).NotTo((BeNil()))
@@ -841,7 +849,7 @@ var _ = Describe("Spyre State Updater", func() {
 		oneNDev := int32(1)
 		DescribeTable("classic allocation",
 			func(allocations map[string]bool, requested []string, nDev int32, expectedSelection []string) {
-				os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
+				_ = os.Unsetenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey())
 				Expect(err).To(BeNil())
 				deviceMap := make(map[string]*pluginapi.Device)
 				for dev, allocated := range allocations {
@@ -854,16 +862,21 @@ var _ = Describe("Spyre State Updater", func() {
 				selectedDeviceIdList := spyredevice.AllocateFromDeviceMap(requested, nDev, deviceMap)
 				Expect(selectedDeviceIdList).To(Equal(expectedSelection))
 			},
-			Entry("request at empty allocation", map[string]bool{"01": false, "02": false}, []string{"01"}, oneNDev, []string{"01"}),
-			Entry("request at empty allocation with alternative devices", map[string]bool{"01": false, "02": false}, []string{"01", "02"}, oneNDev, []string{"01"}),
-			Entry("request at some device allocated", map[string]bool{"01": true, "02": false}, []string{"01", "02"}, oneNDev, []string{"02"}),
-			Entry("request at all devices allocated", map[string]bool{"01": true, "02": true}, []string{"01", "02"}, oneNDev, nil),
+			Entry("request at empty allocation",
+				map[string]bool{"01": false, "02": false}, []string{"01"}, oneNDev, []string{"01"}),
+			Entry("request at empty allocation with alternative devices",
+				map[string]bool{"01": false, "02": false}, []string{"01", "02"}, oneNDev, []string{"01"}),
+			Entry("request at some device allocated",
+				map[string]bool{"01": true, "02": false}, []string{"01", "02"}, oneNDev, []string{"02"}),
+			Entry("request at all devices allocated",
+				map[string]bool{"01": true, "02": true}, []string{"01", "02"}, oneNDev, nil),
 		)
 
 		DescribeTable("reservation-based allocation",
-			func(before *spyrev1alpha1.SpyreNodeStateStatus, resourceName string, requestedDevices []string, nDev int32, expectedSelection []string, expectedErrorMessage string) {
+			func(before *spyrev1alpha1.SpyreNodeStateStatus, resourceName string,
+				requestedDevices []string, nDev int32, expectedSelection []string, expectedErrorMessage string) {
 				ctx := context.Background()
-				os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
+				_ = os.Setenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey(), spyreconst.ModeEnabledValue)
 				// set "before"
 				s1, err := spyreClient.Get(ctx, node)
 				Expect(err).To(BeNil())
@@ -877,7 +890,8 @@ var _ = Describe("Spyre State Updater", func() {
 				Expect(s2.Status).Should(Equal(s1.Status))
 
 				// allocate
-				selectedDeviceIdList, err := spyredevice.AllocateReservedDevices(ctx, spyreClient, resourceName, requestedDevices, nDev)
+				selectedDeviceIdList, err := spyredevice.AllocateReservedDevices(
+					ctx, spyreClient, resourceName, requestedDevices, nDev)
 				if expectedErrorMessage == "" {
 					Expect(err).To(BeNil())
 				} else {
@@ -887,7 +901,8 @@ var _ = Describe("Spyre State Updater", func() {
 				Expect(selectedDeviceIdList).To(Equal(expectedSelection))
 			},
 			Entry("no reservation causes error",
-				&spyrev1alpha1.SpyreNodeStateStatus{}, "spyre_pf", []string{"00", "01"}, int32(2), nil, "unable to find reservation for resource"),
+				&spyrev1alpha1.SpyreNodeStateStatus{}, "spyre_pf", []string{"00", "01"}, int32(2), nil,
+				"unable to find reservation for resource"),
 			Entry("different reservation causes error",
 				&spyrev1alpha1.SpyreNodeStateStatus{
 					Reservations: map[string]spyrev1alpha1.Reservation{

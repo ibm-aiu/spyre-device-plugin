@@ -88,7 +88,11 @@ func NewResourceManager(cp *CliParams, spyreClient *spyreclient.SpyreClient) *Re
 // NewResourceManagerWithConfig creates a new ResourceManager with an optional Kubernetes config.
 // If cfg is nil, it will use ctrl.GetConfigOrDie() to get the config.
 // This allows tests to provide a mock config from envtest.
-func NewResourceManagerWithConfig(cp *CliParams, spyreClient *spyreclient.SpyreClient, cfg *rest.Config) *ResourceManager {
+func NewResourceManagerWithConfig(
+	cp *CliParams,
+	spyreClient *spyreclient.SpyreClient,
+	cfg *rest.Config,
+) *ResourceManager {
 	pluginWatchMode := utils.DetectPluginWatchMode(types.SockDir)
 	if pluginWatchMode {
 		glog.Infof("Using Kubelet Plugin Registry Mode")
@@ -178,7 +182,8 @@ func (rm *ResourceManager) ReadConfig() error {
 
 	for i := range resources.ResourceList {
 		conf := &resources.ResourceList[i]
-		if os.Getenv(spyrev1alpha1.DisableVfMode.EnvKey()) == spyreconst.ModeEnabledValue && conf.ResourceName == spyreconst.VfResourceName {
+		if os.Getenv(spyrev1alpha1.DisableVfMode.EnvKey()) == spyreconst.ModeEnabledValue &&
+			conf.ResourceName == spyreconst.VfResourceName {
 			continue
 		}
 		// Validate deviceType
@@ -198,8 +203,11 @@ func (rm *ResourceManager) ReadConfig() error {
 	return nil
 }
 
-func createResourceServer(rf types.ResourceFactory, rc *types.ResourceConfig, devices []types.PciDevice) (types.ResourceServer, error) {
-
+func createResourceServer(
+	rf types.ResourceFactory,
+	rc *types.ResourceConfig,
+	devices []types.PciDevice,
+) (types.ResourceServer, error) {
 	rPool, err := rf.GetResourcePool(rc, devices)
 	if err != nil {
 		glog.Errorf("initServers(): error creating ResourcePool with config %+v: %q", rc, err)
@@ -253,7 +261,8 @@ func (rm *ResourceManager) InitServers() error {
 			perDevicePools := make(map[string][]types.PciDevice, len(filteredDevices))
 			for _, dev := range filteredDevices {
 				var pciAddress string
-				if rc.ResourceName == spyreconst.PfResourceName || (rc.ResourceName == spyreconst.VfResourceName && dev.IsIsolatedVF()) {
+				if rc.ResourceName == spyreconst.PfResourceName || (rc.ResourceName == spyreconst.VfResourceName &&
+					dev.IsIsolatedVF()) {
 					pciAddress = dev.GetPciAddr()
 				} else {
 					pciAddress = dev.GetPfPciAddr()
@@ -311,8 +320,16 @@ func (rm *ResourceManager) InitServers() error {
 }
 
 // handles newly detected devices
-func (rm *ResourceManager) HandleHotpluggedDevices(ctx context.Context, cfg *rest.Config, spyreClient *spyreclient.SpyreClient, newDevices []types.PciDevice) {
-	glog.Infof("Hotplug event: %d new devices detected, adding per-device servers and triggering resource updates", len(newDevices))
+func (rm *ResourceManager) HandleHotpluggedDevices(
+	ctx context.Context,
+	cfg *rest.Config,
+	spyreClient *spyreclient.SpyreClient,
+	newDevices []types.PciDevice,
+) {
+	glog.Infof(
+		"Hotplug event: %d new devices detected, adding per-device servers and triggering resource updates",
+		len(newDevices),
+	)
 
 	rm.filteredDevices = append(rm.filteredDevices, newDevices...)
 	// Add new devices to the device provider first
@@ -380,7 +397,8 @@ func (rm *ResourceManager) addPerDeviceServersForNewDevices(newDevices []types.P
 			resourceName = spyreconst.VfResourceName
 		}
 		var pciAddress string
-		if resourceName == spyreconst.PfResourceName || (resourceName == spyreconst.VfResourceName && newDevice.IsIsolatedVF()) {
+		if resourceName == spyreconst.PfResourceName || (resourceName == spyreconst.VfResourceName &&
+			newDevice.IsIsolatedVF()) {
 			pciAddress = newDevice.GetPciAddr()
 		} else {
 			pciAddress = newDevice.GetPfPciAddr()
@@ -442,10 +460,16 @@ func (rm *ResourceManager) updateAggregatedResourcePools(newDevices []types.PciD
 		case resourceName == spyreconst.VfResourceName && isVf:
 			shouldUpdate = true
 			configName = spyreconst.VfResourceName
-		case perDeviceMode && strings.HasPrefix(resourceName, spyreconst.PfResourceName+"_") && isPf && !strings.HasSuffix(resourceName, "tier"):
+		case perDeviceMode && strings.HasPrefix(resourceName, spyreconst.PfResourceName+"_") && isPf && !strings.HasSuffix(
+			resourceName,
+			"tier",
+		):
 			shouldUpdate = true
 			configName = spyreconst.PfResourceName // base PF config
-		case perDeviceMode && strings.HasPrefix(resourceName, spyreconst.VfResourceName+"_") && isVf && !strings.HasSuffix(resourceName, "tier"):
+		case perDeviceMode && strings.HasPrefix(resourceName, spyreconst.VfResourceName+"_") && isVf && !strings.HasSuffix(
+			resourceName,
+			"tier",
+		):
 			shouldUpdate = true
 			configName = spyreconst.VfResourceName // base VF config
 		}
@@ -484,7 +508,12 @@ func (rm *ResourceManager) updateAggregatedResourcePools(newDevices []types.PciD
 				strings.HasPrefix(resourceName, spyreconst.VfResourceName+"_")) {
 
 			pciAddr := extractPCIAddr(resourceName)
-			glog.V(1).Infof("Per-device filtering for %s: extracted PCI addr '%s' from %d devices", resourceName, pciAddr, len(allDevices))
+			glog.V(1).Infof(
+				"Per-device filtering for %s: extracted PCI addr '%s' from %d devices",
+				resourceName,
+				pciAddr,
+				len(allDevices),
+			)
 			allDevices = filterDevicesByPCIAddr(allDevices, pciAddr)
 			glog.V(1).Infof("After filtering for PCI addr '%s': %d devices remain", pciAddr, len(allDevices))
 		}
@@ -550,8 +579,12 @@ func filterDevicesByPCIAddr(devices []types.PciDevice, addr string) []types.PciD
 	return result
 }
 
-func (rm *ResourceManager) StartSpyreNodeStateUpdateTicker(ctx context.Context, cfg *rest.Config, spyreClient *spyreclient.SpyreClient, quit chan interface{}) {
-
+func (rm *ResourceManager) StartSpyreNodeStateUpdateTicker(
+	ctx context.Context,
+	cfg *rest.Config,
+	spyreClient *spyreclient.SpyreClient,
+	quit chan interface{},
+) {
 	// Clear existing node state before first write
 	if nodeState, err := spyredevice.GetNodeStateForThisNode(ctx, spyreClient); err == nil {
 		nodeState.Spec.SpyreInterfaces = []spyrev1alpha1.SpyreInterface{}
@@ -563,7 +596,9 @@ func (rm *ResourceManager) StartSpyreNodeStateUpdateTicker(ctx context.Context, 
 	}
 
 	// first call
-	if _, err := spyredevice.WriteSpyreInterfacesToNodeState(ctx, cfg, rm.filteredDevices, spyreClient, false, nil); err != nil {
+	if _, err := spyredevice.WriteSpyreInterfacesToNodeState(
+		ctx, cfg, rm.filteredDevices, spyreClient, false, nil,
+	); err != nil {
 		glog.Error("failed to write SpyreNodeState", err)
 	}
 	if _, err := spyredevice.InitAllocationList(ctx, cfg, spyreClient); err != nil {
@@ -608,7 +643,10 @@ func (rm *ResourceManager) StartSpyreNodeStateUpdateTicker(ctx context.Context, 
 	}()
 }
 
-func (rm *ResourceManager) excludeAllocatedDevices(filteredDevices []types.PciDevice, deviceAllocated map[string]bool) []types.PciDevice {
+func (rm *ResourceManager) excludeAllocatedDevices(
+	filteredDevices []types.PciDevice,
+	deviceAllocated map[string]bool,
+) []types.PciDevice {
 	filteredDevicesTemp := []types.PciDevice{}
 	for _, dev := range filteredDevices {
 		if !deviceAllocated[dev.GetPciAddr()] {
@@ -783,7 +821,7 @@ func (rm *ResourceManager) DiscoverHostDevices() error {
 			}
 		}
 		if runtime.GOARCH != sriovVFArch {
-			vfDevices := []*ghw.PCIDevice{}
+			vfDevices := make([]*ghw.PCIDevice, 0, 2*len(devices))
 			for _, device := range devices {
 				// spyre_vf devices
 				vf1 := utils.GetPseudoVfAddress(device.Address, 1)

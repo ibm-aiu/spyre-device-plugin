@@ -249,11 +249,17 @@ func EnsureDynamicTopologyFiltered() error {
 
 	topo, err := GetPciTopology(original, true)
 	if err != nil {
-		return fmt.Errorf("dynamic topology generation failed: unable to parse and filter original topology file %q: %w", original, err)
+		return fmt.Errorf(
+			"dynamic topology generation failed: unable to parse and filter original topology file %q: %w",
+			original, err)
 	}
 
 	if err := SaveDynamicTopology(topo); err != nil {
-		return fmt.Errorf("dynamic topology generation failed: unable to save filtered topology to %q: %w", DynamicTopologyFilepath, err)
+		return fmt.Errorf(
+			"dynamic topology generation failed: unable to save filtered topology to %q: %w",
+			DynamicTopologyFilepath,
+			err,
+		)
 	}
 	return nil
 }
@@ -316,7 +322,11 @@ func SaveDynamicTopology(topo pcitopov2.Pcitopo) error {
 // GetMaxValidPeers returns a single group of requested tier + self-allocated devices
 // Topology-aware resource for VFs is not supported without external reservation mode.
 // This function should not be activated on vf resource.
-func GetMaxValidPeers(deviceMap map[string]*pluginapi.Device, resourceName string, selfAllocation map[string]bool) map[string]*pluginapi.Device { //nolint:lll
+func GetMaxValidPeers(
+	deviceMap map[string]*pluginapi.Device,
+	resourceName string,
+	selfAllocation map[string]bool,
+) map[string]*pluginapi.Device {
 	topo, err := GetPciTopology("", false)
 	if err != nil {
 		glog.Warningf("try GetMaxValidPeers but topol is nil, return as-is")

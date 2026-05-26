@@ -85,7 +85,8 @@ func (rs *resourceServer) GetResourcePool() types.ResourcePool {
 }
 
 // NewResourceServer returns an instance of ResourceServer
-func NewResourceServer(prefix, suffix string, pluginWatch bool, rp types.ResourcePool, spyreClient *spyreclient.SpyreClient,
+func NewResourceServer(prefix, suffix string, pluginWatch bool, rp types.ResourcePool,
+	spyreClient *spyreclient.SpyreClient,
 	allocatedCh chan types.AllocationInfo, topologyFilepath string) types.ResourceServer {
 
 	sockName := fmt.Sprintf("%s_%s.%s", prefix, rp.GetResourceName(), suffix)
@@ -165,7 +166,9 @@ func (rs *resourceServer) NotifyRegistrationStatus(ctx context.Context,
 	return &registerapi.RegistrationStatusResponse{}, nil
 }
 
-func (rs *resourceServer) GetPreferredAllocation(ctx context.Context, rqt *pluginapi.PreferredAllocationRequest) (fResp *pluginapi.PreferredAllocationResponse, fErr error) { //nolint:lll
+func (rs *resourceServer) GetPreferredAllocation(
+	ctx context.Context,
+	rqt *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
 	glog.V(1).Infof("GetPreferredAllocationAllocation() called with %+v", rqt)
 	resp := new(pluginapi.PreferredAllocationResponse)
 	var err error
@@ -205,7 +208,10 @@ func (rs *resourceServer) GetPreferredAllocation(ctx context.Context, rqt *plugi
 	return resp, err
 }
 
-func (rs *resourceServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) { //nolint:lll
+func (rs *resourceServer) Allocate(
+	ctx context.Context,
+	rqt *pluginapi.AllocateRequest,
+) (*pluginapi.AllocateResponse, error) {
 	glog.V(1).Infof("Allocate() called with %+v", rqt)
 	resp := new(pluginapi.AllocateResponse)
 	for _, container := range rqt.ContainerRequests {
@@ -250,10 +256,10 @@ func (rs *resourceServer) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.
 	glog.V(1).Infof("%s invoked", methodID)
 
 	// Send initial list of devices
-	devs := make([]*pluginapi.Device, 0)
 	resp := new(pluginapi.ListAndWatchResponse)
 	rp := rs.resourcePool
 	deviceMap := rp.GetDevices()
+	devs := make([]*pluginapi.Device, 0, len(deviceMap))
 	if !utils.IsReservationMode() {
 		if rp.IsTopologyAware() {
 			deviceMap = spyretopo.GetMaxValidPeers(deviceMap, rp.GetResourceName(), rp.GetSelfAllocation())
@@ -313,11 +319,21 @@ func (rs *resourceServer) PreStartContainer(ctx context.Context,
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-func (rs *resourceServer) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) { //nolint:lll
-	glog.V(1).Infof("plugin option perDeviceAllocation: %s\n", os.Getenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey()))
-	glog.V(1).Infof("plugin option topologyAwareAllocation: %s\n", os.Getenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey()))
+func (rs *resourceServer) GetDevicePluginOptions(
+	ctx context.Context,
+	empty *pluginapi.Empty,
+) (*pluginapi.DevicePluginOptions, error) {
+	glog.V(1).Infof(
+		"plugin option perDeviceAllocation: %s\n",
+		os.Getenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey()),
+	)
+	glog.V(1).Infof(
+		"plugin option topologyAwareAllocation: %s\n",
+		os.Getenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey()),
+	)
 	preferredAlloc := os.Getenv(spyrev1alpha1.PerDeviceAllocationMode.EnvKey()) == spyreconst.ModeEnabledValue ||
-		os.Getenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey()) == spyreconst.ModeEnabledValue
+		os.Getenv(spyrev1alpha1.TopologyAwareAllocationMode.EnvKey()) ==
+			spyreconst.ModeEnabledValue
 	glog.V(1).Infof("preferredAlloc: %v\n", preferredAlloc)
 	return &pluginapi.DevicePluginOptions{
 		PreStartRequired:                false,
