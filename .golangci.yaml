@@ -1,6 +1,9 @@
+version: 2
+
 run:
   timeout: 10m
   allow-parallel-runners: true
+  modules-download-mode: readonly
 
 issues:
   # don't exclude the default set of lint
@@ -10,12 +13,18 @@ issues:
     linters:
     - lll
     - errcheck
+  - path: "test/*"
+    linters:
     - goconst
-
+    - lll
+    - unparam
+  - path: "controllers/*"
+    linters:
+    - lll
   - path: "api/*"
     linters:
     - lll
-  - path: "cmd/*"
+  - path: "const/*"
     linters:
     - lll
 
@@ -27,9 +36,6 @@ linters:
   - copyloopvar
   - goconst
   - gocyclo
-  - gofmt
-  - goimports
-  - gosimple
   - govet
   - ineffassign
   - lll
@@ -37,7 +43,6 @@ linters:
   - nakedret
   - prealloc
   - staticcheck
-  - typecheck
   - unconvert
   - unparam
   - unused
@@ -45,4 +50,9 @@ linters:
 
 linters-settings:
   lll:
-    line-length: 140
+    line-length: 130 # or any length you prefer
+
+formatters:
+  enable:
+  - gofmt
+  - goimports

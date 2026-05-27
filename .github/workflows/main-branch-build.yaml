@@ -15,6 +15,9 @@ permissions:
   contents: read
   packages: write # Crucial for pushing to ghcr.io
 
+env:
+  GOTOOLCHAIN: auto
+
 jobs:
   build:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/build-image.yaml@main

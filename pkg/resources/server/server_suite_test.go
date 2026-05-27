@@ -60,13 +60,13 @@ var (
 )
 
 func startRuntimeServer() {
-	os.Remove(socketFile)
+	_ = os.Remove(socketFile)
 	var err error
 	// Create a listener on a fake Unix socket path
 	lis, err = net.Listen("unix", socketFile)
 	if err == nil {
 		ServerRunning = true
-		defer lis.Close()
+		defer func() { _ = lis.Close() }()
 		// Create gRPC server
 		grpcServer := grpc.NewServer()
 		// Register mock server to handle requests
@@ -91,8 +91,8 @@ func createNewNamespace() string {
 }
 
 var _ = BeforeSuite(func() {
-	os.Setenv(spyreconf.TemplatePathKey, testSenlibTemplate)
-	os.Setenv(spyrert.RuntimeUnixSocketKey, fakeUnixSocketPath)
+	_ = os.Setenv(spyreconf.TemplatePathKey, testSenlibTemplate)
+	_ = os.Setenv(spyrert.RuntimeUnixSocketKey, fakeUnixSocketPath)
 	go startRuntimeServer()
 
 	var err error
@@ -137,10 +137,10 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	lis.Close()
-	os.Remove(fakeUnixSocketPath)
-	os.RemoveAll(TestConfigHostPath)
-	os.RemoveAll(TestMetricsHostPath)
+	_ = lis.Close()
+	_ = os.Remove(fakeUnixSocketPath)
+	_ = os.RemoveAll(TestConfigHostPath)
+	_ = os.RemoveAll(TestMetricsHostPath)
 
 	By("tearing down the test environment")
 	if testEnv != nil {

@@ -13,9 +13,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var AllocateFromDeviceMap = allocateFromDeviceMap
-var AllocateReservedDevices = allocateReservedDevices
-
 func TestSpyredevice(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Spyredevice Suite")

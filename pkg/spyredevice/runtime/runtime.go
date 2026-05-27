@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/ibm-aiu/spyre-device-plugin/pkg/spyredevice/config"
 	spyreconf "github.com/ibm-aiu/spyre-device-plugin/pkg/spyredevice/config"
 	"github.com/ibm-aiu/spyre-device-plugin/pkg/utils"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
@@ -263,7 +262,7 @@ func CheckConflict(resourcePool string, deviceIDs []string) bool {
 	}
 	mountedDevices := []string{}
 	for mnt := range mountPoints {
-		if !strings.Contains(mnt, config.SpyreConfigBaseFolderName) {
+		if !strings.Contains(mnt, spyreconf.SpyreConfigBaseFolderName) {
 			continue // irrelevant mount point
 		}
 		if _, err = os.Stat(mnt); errors.Is(err, os.ErrNotExist) {

@@ -51,8 +51,8 @@ type SpyrePodEvent struct {
 
 func (se *SpyrePodEvent) Equal(other *SpyrePodEvent) bool {
 	return se.EventType == other.EventType &&
-		se.Pod.ObjectMeta.Name == other.Pod.ObjectMeta.Name &&
-		se.Pod.ObjectMeta.Namespace == other.Pod.ObjectMeta.Namespace
+		se.Name == other.Name &&
+		se.Namespace == other.Namespace
 }
 
 type AllocationMemo struct {
@@ -81,7 +81,12 @@ const (
 	DeleteEvent      EventType = "DELETE"
 )
 
-func NewPodWatcher(config *rest.Config, allocateCh chan types.AllocationInfo, mountedCh chan []string, deallocatedCh chan types.DeallocationInfo) (*PodWatcher, error) { //nolint:lll
+func NewPodWatcher(
+	config *rest.Config,
+	allocateCh chan types.AllocationInfo,
+	mountedCh chan []string,
+	deallocatedCh chan types.DeallocationInfo,
+) (*PodWatcher, error) {
 	var err error
 	var clientset *kubernetes.Clientset
 	if clientset, err = kubernetes.NewForConfig(config); err == nil {
@@ -257,7 +262,9 @@ func (w *PodWatcher) NotifyInitialAllocationList() {
 		FieldSelector: fieldSelector,
 	}
 
-	if initialPodList, err := w.Clientset.CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), listOptions); err == nil { //nolint:lll
+	initialPodList, err := w.Clientset.CoreV1().Pods(metav1.NamespaceAll).List(
+		context.Background(), listOptions)
+	if err == nil {
 		allocationList := []spyrev1alpha1.Allocation{}
 		allocationInfoList := []types.AllocationInfo{}
 		for _, p := range initialPodList.Items {
@@ -421,7 +428,8 @@ func (w *PodWatcher) allocateAndRequeueIfFailed(ctx context.Context, event *Spyr
 }
 
 // allocate updates allocatedDeviceIDs in SpyreNodeState if not exists.
-func (w *PodWatcher) allocate(ctx context.Context, p corev1.Pod, allocatedDeviceIDs []string, resourceName string) error {
+func (w *PodWatcher) allocate(
+	ctx context.Context, p corev1.Pod, allocatedDeviceIDs []string, resourceName string) error {
 	var err error
 	var nodeState *spyrev1alpha1.SpyreNodeState
 
@@ -525,7 +533,10 @@ func getPodKey(pod corev1.Pod) string {
 }
 
 func reconcileReservation(
-	nodeState *spyrev1alpha1.SpyreNodeState, pod *spyrev1alpha1.Pod, allocatedDeviceIDs []string) map[string]spyrev1alpha1.Reservation {
+	nodeState *spyrev1alpha1.SpyreNodeState,
+	pod *spyrev1alpha1.Pod,
+	allocatedDeviceIDs []string,
+) map[string]spyrev1alpha1.Reservation {
 
 	newReservations := make(map[string]spyrev1alpha1.Reservation)
 	sAllocDevs := make([]string, len(allocatedDeviceIDs))

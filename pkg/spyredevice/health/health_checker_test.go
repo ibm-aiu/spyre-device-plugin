@@ -21,8 +21,8 @@ import (
 
 var _ = Describe("HealthChecker", Serial, Ordered, func() {
 	BeforeAll(func() {
-		os.Setenv(TLSCertPathEnvKey, "/tmp/certs/tls.crt")
-		os.Setenv(TLSKeyPathEnvKey, "/tmp/certs/tls.key")
+		_ = os.Setenv(TLSCertPathEnvKey, "/tmp/certs/tls.crt")
+		_ = os.Setenv(TLSKeyPathEnvKey, "/tmp/certs/tls.key")
 		if err := createDummyTLSCertificates(); err != nil {
 			Skip(fmt.Sprintf("Cannot create TLS certificates for testing: %v", err))
 		}
@@ -30,8 +30,8 @@ var _ = Describe("HealthChecker", Serial, Ordered, func() {
 
 	AfterAll(func() {
 		cleanupDummyTLSCertificates()
-		os.Unsetenv(TLSCertPathEnvKey)
-		os.Unsetenv(TLSKeyPathEnvKey)
+		_ = os.Unsetenv(TLSCertPathEnvKey)
+		_ = os.Unsetenv(TLSKeyPathEnvKey)
 	})
 
 	Context("GetHealthChecker", func() {
@@ -39,16 +39,16 @@ var _ = Describe("HealthChecker", Serial, Ordered, func() {
 			_, err := NewSpyreHealthClient()
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(HavePrefix("failed to get spyrehealth socket"))
-			os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
+			_ = os.Setenv(spyrev1alpha1.PseudoDeviceMode.EnvKey(), spyreconst.ModeEnabledValue)
 			checker := GetHealthChecker(DefaultScanInterval)
 			Expect(checker).To(BeNil(), "should not get %v", checker)
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 		})
 		It("can get PciMonitor", func() {
 			_, err := NewSpyreHealthClient()
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(HavePrefix("failed to get spyrehealth socket"))
-			os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
+			_ = os.Unsetenv(spyrev1alpha1.PseudoDeviceMode.EnvKey())
 			customScanInterval := 99 * time.Second
 			checker := GetHealthChecker(customScanInterval)
 			pciMonitor, ok := checker.(*PCIMonitor)

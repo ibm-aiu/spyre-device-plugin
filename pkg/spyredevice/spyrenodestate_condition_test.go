@@ -23,7 +23,8 @@ var _ = Describe("SpyreNodeStates Condition", func() {
 			previousCondition, expectedCondition metav1.Condition, expectedChanged bool) {
 			previousCondition.LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
 			healthCondition := NewSpyreNodeStateHealthCondition(hasDevice, unhealthyDevices)
-			changed, newCondition := healthCondition.UpdateCondition(previousCondition.Status, previousCondition.Message, previousCondition.LastTransitionTime)
+			changed, newCondition := healthCondition.UpdateCondition(
+				previousCondition.Status, previousCondition.Message, previousCondition.LastTransitionTime)
 			Expect(changed).To(Equal(expectedChanged))
 			Expect(newCondition.Type).To(Equal(ConditionTypeDeviceHealthy))
 			Expect(newCondition.Status).To(Equal(expectedCondition.Status))
