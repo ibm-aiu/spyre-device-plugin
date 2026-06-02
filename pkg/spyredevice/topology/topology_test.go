@@ -318,7 +318,7 @@ var _ = Describe("Test Topology", func() {
 	ctx := context.Background()
 
 	Context("Pseudo topology file", func() {
-		It("can unmarshal pseudo topology file in init container", func() {
+		It("can unmarshal pseudo topology file in init container data", func() {
 			pciTopo, err := GetPciTopology(pseudoTopologyFilePath, false)
 			Expect(err).To(BeNil())
 			Expect(pciTopo.Devices).To(HaveLen(8))
