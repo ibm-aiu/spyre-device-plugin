@@ -90,13 +90,14 @@ const (
 )
 
 type MockRuntimeServiceServer struct {
+	UnimplementedRuntimeServiceServer
 	mu            sync.RWMutex
-	fakeContainer map[string]CreateContainerRequest
+	fakeContainer map[string]*CreateContainerRequest
 }
 
 func NewMockRuntimeServiceServer() *MockRuntimeServiceServer {
 	return &MockRuntimeServiceServer{
-		fakeContainer: make(map[string]CreateContainerRequest),
+		fakeContainer: make(map[string]*CreateContainerRequest),
 	}
 }
 
@@ -119,9 +120,9 @@ func (s *MockRuntimeServiceServer) CreateContainer(
 		return nil, fmt.Errorf("failed to generate new container ID (max retry: %d)", uuidGenerateMaxRetry)
 	}
 	s.mu.Lock()
-	s.fakeContainer[containerId] = *req
+	s.fakeContainer[containerId] = req
 	s.mu.Unlock()
-	glog.Infof("successfully create container %v", *req)
+	glog.Infof("successfully create container %v", req)
 	return &CreateContainerResponse{ContainerId: containerId}, nil
 }
 
@@ -145,6 +146,7 @@ func (s *MockRuntimeServiceServer) ListContainers(
 func (s *MockRuntimeServiceServer) ContainerStatus(
 	ctx context.Context, req *ContainerStatusRequest) (*ContainerStatusResponse, error) {
 	s.mu.RLock()
+	var createRequest *CreateContainerRequest
 	createRequest, found := s.fakeContainer[req.ContainerId]
 	s.mu.RUnlock()
 	if !found {
@@ -201,6 +203,7 @@ func (*MockRuntimeServiceServer) ListPodSandbox(
 	ctx context.Context, req *ListPodSandboxRequest) (*ListPodSandboxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandbox not implemented")
 }
+
 func (*MockRuntimeServiceServer) StartContainer(
 	ctx context.Context, req *StartContainerRequest) (*StartContainerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartContainer not implemented")
@@ -274,6 +277,11 @@ func (*MockRuntimeServiceServer) ListPodSandboxMetrics(
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
 func (*MockRuntimeServiceServer) RuntimeConfig(context.Context, *RuntimeConfigRequest) (*RuntimeConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
+}
+
+func (*MockRuntimeServiceServer) UpdatePodSandboxResources(ctx context.Context,
+	req *UpdatePodSandboxResourcesRequest) (*UpdatePodSandboxResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
 

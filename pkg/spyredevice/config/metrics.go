@@ -52,11 +52,9 @@ func getMetricsMount(configHostMntPath string) (*pluginapi.Mount, error) {
 		return nil, err
 	}
 	return &pluginapi.Mount{
-		ContainerPath:        metricsContainerPath,
-		HostPath:             outputPath,
-		ReadOnly:             false,
-		XXX_NoUnkeyedLiteral: struct{}{},
-		XXX_sizecache:        0,
+		ContainerPath: metricsContainerPath,
+		HostPath:      outputPath,
+		ReadOnly:      false,
 	}, nil
 }
 
