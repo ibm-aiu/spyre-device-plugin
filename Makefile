@@ -6,7 +6,7 @@
 export GOTOOLCHAIN = auto
 
 GOLANG_VERSION		?= $(shell cd $(REPO_ROOT) && go list -f {{.GoVersion}} -m)
-BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:9.6-1745588370
+BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778675823
 GOTOOLCHAIN			?= go$(GOLANG_VERSION)
 MAKEFILE_PATH		:= $(abspath $(lastword $(MAKEFILE_LIST)))
 REPO_ROOT 			:= $(abspath $(patsubst %/,%,$(dir $(MAKEFILE_PATH))))
