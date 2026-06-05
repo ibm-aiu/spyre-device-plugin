@@ -38,9 +38,9 @@ var _ = Describe("Config", func() {
 	originalMetadataPath := ""
 
 	var _ = BeforeEach(func() {
-		os.Setenv(TemplatePathKey, TestTemplatePath)
-		os.Setenv(HostPathKey, TestConfigHostPath)
-		os.Setenv(MetricsHostPathKey, TestMetricsHostPath)
+		_ = os.Setenv(TemplatePathKey, TestTemplatePath)
+		_ = os.Setenv(HostPathKey, TestConfigHostPath)
+		_ = os.Setenv(MetricsHostPathKey, TestMetricsHostPath)
 		var err error
 		Handler, err = InitConfigMount()
 		Expect(err).To(BeNil())
@@ -57,7 +57,7 @@ var _ = Describe("Config", func() {
 		Expect(err).To(BeNil())
 		err = os.RemoveAll(TestMetricsHostPath)
 		Expect(err).To(BeNil())
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		topology.MetadataTopologyFilepath = originalMetadataPath
 	})
 
@@ -83,8 +83,8 @@ var _ = Describe("Config", func() {
 	})
 
 	It("get correct config and metrics mounts when metrics is enabled", func() {
-		os.Setenv(TemplatePathKey, "../../../test/data/senlib_config/enable")
-		var err error
+		err := os.Setenv(TemplatePathKey, "../../../test/data/senlib_config/enable")
+		Expect(err).NotTo(HaveOccurred())
 		Handler, err = InitConfigMount()
 		Expect(err).To(BeNil())
 
@@ -113,8 +113,8 @@ var _ = Describe("CopyTopologyFile", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
-		os.RemoveAll(testOutputDir)
+		_ = os.RemoveAll(tempDir)
+		_ = os.RemoveAll(testOutputDir)
 		topology.MetadataTopologyFilepath = originalMetadataPath
 	})
 

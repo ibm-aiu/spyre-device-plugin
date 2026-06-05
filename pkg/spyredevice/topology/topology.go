@@ -249,11 +249,16 @@ func EnsureDynamicTopologyFiltered() error {
 
 	topo, err := GetPciTopology(original, true)
 	if err != nil {
-		return fmt.Errorf("dynamic topology generation failed: unable to parse and filter original topology file %q: %w", original, err)
+		return fmt.Errorf(
+			"dynamic topology generation failed: unable to parse and filter original topology file %q: %w",
+			original, err)
 	}
 
 	if err := SaveDynamicTopology(topo); err != nil {
-		return fmt.Errorf("dynamic topology generation failed: unable to save filtered topology to %q: %w", DynamicTopologyFilepath, err)
+		return fmt.Errorf(
+			"dynamic topology generation failed: "+
+				"unable to save filtered topology to %q: %w",
+			DynamicTopologyFilepath, err)
 	}
 	return nil
 }
