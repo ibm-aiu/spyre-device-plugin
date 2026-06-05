@@ -21,11 +21,13 @@ COPY pkg/ pkg/
 # Build
 ARG BUILD_FLAGS=""
 
-ENV GOTOOLCHAIN="auto"
+ENV GOTOOLCHAIN="local"
 
-RUN echo "TARGETARCH = '${TARGETARCH}' TARGETOS='${TARGETOS}'" && \
-    echo "GO ENV DUMP: " && go env GOVERSION && go env GOTOOLDIR && \
-    CGO_ENABLED=1 GOOS=linux \
+RUN echo "TARGETARCH: ${TARGETARCH}" && \
+    echo "TARGETOS: ${TARGETOS}" && \
+    echo -n "GOVERSION: " && go env GOVERSION && \
+    echo -n "GOTOOLCHAIN: " && go env GOTOOLCHAIN && \
+    CGO_ENABLED=1 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" GO111MODULE=on GOTOOLCHAIN="${GOTOOLCHAIN}" \
     go build ${BUILD_FLAGS} -mod vendor -tags strictfipsruntime -a -o spyre-device-plugin ./cmd/spyre
 
 RUN --mount=type=cache,target=/var/cache/dnf \
