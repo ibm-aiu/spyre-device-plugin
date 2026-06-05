@@ -4,6 +4,7 @@
  # +-------------------------------------------------------------------+
 # use "auto" for local go build.
 export GOTOOLCHAIN	= auto
+export GOPROXY		= https://proxy.golang.org,direct
 GOLANG_VERSION		?= $(shell cd $(REPO_ROOT) && go list -f {{.GoVersion}} -m)
 
 BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778675823
@@ -236,6 +237,7 @@ docker-build: vendor ## Build spyre device plugin image for build host architect
 	--build-arg VERSION="$(VERSION)" \
 	--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 	--build-arg BUILD_FLAGS="$(DOCKER_GO_BUILD_FLAGS)" \
+	--build-arg GOPROXY="$(GOPROXY)" \
 	--file $(DOCKERFILE) $(CURDIR)
 
 .PHONY: docker-push
