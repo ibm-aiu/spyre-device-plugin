@@ -44,11 +44,9 @@ type PseudoPciDevice struct {
 func NewPseudoPciDevice(dev *ghw.PCIDevice) types.PciDevice {
 	pfAddr := utils.GetPseudoPfAddress(dev.Address)
 	apiDevice := &pluginapi.Device{
-		ID:                   dev.Address,
-		Health:               "Healthy",
-		Topology:             nil,
-		XXX_NoUnkeyedLiteral: struct{}{},
-		XXX_sizecache:        0,
+		ID:       dev.Address,
+		Health:   "Healthy",
+		Topology: nil,
 	}
 	return &PseudoPciDevice{
 		PciAddress: dev.Address,
@@ -105,11 +103,9 @@ func (d *PseudoPciDevice) IsSriovPF() bool {
 func (d *PseudoPciDevice) GetDeviceSpecs() []*pluginapi.DeviceSpec {
 	v := []*pluginapi.DeviceSpec{
 		{
-			ContainerPath:        "/dev/vfio/vfio",
-			HostPath:             "/dev/vfio/vfio",
-			Permissions:          "mrw",
-			XXX_NoUnkeyedLiteral: struct{}{},
-			XXX_sizecache:        0,
+			ContainerPath: "/dev/vfio/vfio",
+			HostPath:      "/dev/vfio/vfio",
+			Permissions:   "mrw",
 		},
 	}
 	return v

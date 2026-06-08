@@ -118,11 +118,9 @@ func getSenlibConfigMount(resourcePool string, deviceIDs []string, outputPath st
 		return nil, err
 	}
 	return &pluginapi.Mount{
-		ContainerPath:        configContainerPath,
-		HostPath:             outputPath,
-		ReadOnly:             true,
-		XXX_NoUnkeyedLiteral: struct{}{},
-		XXX_sizecache:        0,
+		ContainerPath: configContainerPath,
+		HostPath:      outputPath,
+		ReadOnly:      true,
 	}, nil
 }
 

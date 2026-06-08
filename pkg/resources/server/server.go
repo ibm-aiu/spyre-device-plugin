@@ -53,6 +53,8 @@ import (
 )
 
 type resourceServer struct {
+	pluginapi.UnimplementedDevicePluginServer
+	registerapi.UnimplementedRegistrationServer
 	resourcePool       types.ResourcePool
 	pluginWatch        bool
 	endPoint           string // Socket file
@@ -211,14 +213,14 @@ func (rs *resourceServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateR
 	glog.V(1).Infof("Allocate() called with %+v", rqt)
 	resp := new(pluginapi.AllocateResponse)
 	for _, container := range rqt.ContainerRequests {
-		if err := rs.valid(container.DevicesIDs); err != nil {
+		if err := rs.valid(container.DevicesIds); err != nil {
 			glog.Errorf("failed to validate allocation: %v", err)
 			return resp, err
 		}
 		containerResp := new(pluginapi.ContainerAllocateResponse)
-		containerResp.Devices = rs.resourcePool.GetDeviceSpecs(container.DevicesIDs)
-		containerResp.Mounts = rs.resourcePool.GetMounts(container.DevicesIDs)
-		containerResp.Envs = rs.getEnvs(container.DevicesIDs)
+		containerResp.Devices = rs.resourcePool.GetDeviceSpecs(container.DevicesIds)
+		containerResp.Mounts = rs.resourcePool.GetMounts(container.DevicesIds)
+		containerResp.Envs = rs.getEnvs(container.DevicesIds)
 		resp.ContainerResponses = append(resp.ContainerResponses, containerResp)
 		mntPoints := []string{}
 		// inform SpyreDeviceSharedInfo
@@ -229,13 +231,13 @@ func (rs *resourceServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateR
 		}
 		if !utils.IsReservationMode() {
 			rs.allocatedCh <- types.AllocationInfo{
-				DeviceIDs:    container.DevicesIDs,
+				DeviceIDs:    container.DevicesIds,
 				MountPoints:  mntPoints,
 				ResourceName: rs.resourcePool.GetResourceName(),
 			}
 		}
-		if dma.NeedP2PDMAConfigure(container.DevicesIDs) {
-			if err := dma.SetDevResourceFilePermissions(container.DevicesIDs); err != nil {
+		if dma.NeedP2PDMAConfigure(container.DevicesIds) {
+			if err := dma.SetDevResourceFilePermissions(container.DevicesIds); err != nil {
 				glog.V(2).Infof("failed to config for P2P DMA: %v, skip", err)
 			}
 		}
