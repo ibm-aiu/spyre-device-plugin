@@ -17,6 +17,8 @@ updates:
     versions: ["*"]
   - dependency-name: "tags.cncf.io/*"
     versions: ["*"]
+  - dependency-name: "github.com/onsi/ginkgo/v2"
+    versions: ["*"]
 - package-ecosystem: docker
   directory: /images
   schedule:
