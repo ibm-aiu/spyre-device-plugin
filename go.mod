@@ -6,7 +6,7 @@ require (
 	github.com/golang/glog v1.2.5
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ibm-aiu/spyre-health-checker v0.0.0-20260415042316-1745d4eaf90a
+	github.com/ibm-aiu/spyre-health-checker v1.3.0
 	github.com/ibm-aiu/spyre-operator v0.0.0-20260415001142-161550f6564c
 	github.com/jaypipes/ghw v0.24.0
 	github.com/jaypipes/pcidb v1.1.1
