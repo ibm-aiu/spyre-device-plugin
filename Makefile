@@ -69,7 +69,7 @@ PIP                         ?= pip3
 # detect-secrets
 DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=detect-secrets"
 
-# Shamesly copied from: https://github.com/opendatahub-io/opendatahub-operator/blob/a08c94a226585e43387ad263e2653c0fd43130f1/Makefile#L132C1-L139C1
+# Shamelessly copied from: https://github.com/opendatahub-io/opendatahub-operator/blob/a08c94a226585e43387ad263e2653c0fd43130f1/Makefile#L132C1-L139C1
 define go-mod-version
 $(shell go mod graph | grep $(1) 2>/dev/null | head -n 1 | cut -d'@' -f 2)
 endef
