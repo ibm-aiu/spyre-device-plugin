@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ibm-aiu/spyre-health-checker v0.0.0-20260415042316-1745d4eaf90a
 	github.com/ibm-aiu/spyre-operator v0.0.0-20260415001142-161550f6564c
-	github.com/jaypipes/ghw v0.24.0
+	github.com/jaypipes/ghw v0.25.0
 	github.com/jaypipes/pcidb v1.1.1
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.42.1
