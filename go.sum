@@ -73,8 +73,8 @@ github.com/ibm-aiu/spyre-health-checker v0.0.0-20260415042316-1745d4eaf90a h1:pD
 github.com/ibm-aiu/spyre-health-checker v0.0.0-20260415042316-1745d4eaf90a/go.mod h1:Ba6NKHjUpqerap7YnGFMwYmbk9YIQdTGnEz36q4PL9M=
 github.com/ibm-aiu/spyre-operator v0.0.0-20260415001142-161550f6564c h1:0mueVvmTf2hpASGT8MHCOwWt1RS1Yk5YwY3nMC2XYQc=
 github.com/ibm-aiu/spyre-operator v0.0.0-20260415001142-161550f6564c/go.mod h1:oCWNUeR0GL55F/RSHVAYYhiSZD/TWAQam+mL6TY6KCY=
-github.com/jaypipes/ghw v0.24.0 h1:6RBrJzvHvZ0t+hSvqPmOd5b21C4fMsyiyFzWljEj8Wg=
-github.com/jaypipes/ghw v0.24.0/go.mod h1:Qk3UjdH8Xu/OiVyb/eDJqnDsUc+awHU75y23ErZU33s=
+github.com/jaypipes/ghw v0.25.0 h1:+7HlAHtQSrCOafYC6oRjqxuCzDZXBr2dFgVlYRRafrs=
+github.com/jaypipes/ghw v0.25.0/go.mod h1:Qk3UjdH8Xu/OiVyb/eDJqnDsUc+awHU75y23ErZU33s=
 github.com/jaypipes/pcidb v1.1.1 h1:QmPhpsbmmnCwZmHeYAATxEaoRuiMAJusKYkUncMC0ro=
 github.com/jaypipes/pcidb v1.1.1/go.mod h1:x27LT2krrUgjf875KxQXKB0Ha/YXLdZRVmw6hH0G7g8=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
