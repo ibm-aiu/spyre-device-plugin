@@ -23,6 +23,8 @@ var _ = Describe("HealthChecker", Serial, Ordered, func() {
 	BeforeAll(func() {
 		_ = os.Setenv(TLSCertPathEnvKey, "/tmp/certs/tls.crt")
 		_ = os.Setenv(TLSKeyPathEnvKey, "/tmp/certs/tls.key")
+		// The self-signed cert is its own CA for test purposes
+		_ = os.Setenv(TLSCAPathEnvKey, "/tmp/certs/tls.crt")
 		if err := createDummyTLSCertificates(); err != nil {
 			Skip(fmt.Sprintf("Cannot create TLS certificates for testing: %v", err))
 		}
@@ -32,6 +34,7 @@ var _ = Describe("HealthChecker", Serial, Ordered, func() {
 		cleanupDummyTLSCertificates()
 		_ = os.Unsetenv(TLSCertPathEnvKey)
 		_ = os.Unsetenv(TLSKeyPathEnvKey)
+		_ = os.Unsetenv(TLSCAPathEnvKey)
 	})
 
 	Context("GetHealthChecker", func() {

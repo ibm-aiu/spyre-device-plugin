@@ -9,6 +9,7 @@ package health
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
@@ -28,10 +29,13 @@ var (
 	SpyreHealthSocketEnvKey = "SPYRE_HEALTH_SOCK"
 
 	// TLS configuration
-	TLSCertPathEnvKey  = "SPYRE_HEALTH_TLS_CERT_PATH"
-	TLSKeyPathEnvKey   = "SPYRE_HEALTH_TLS_KEY_PATH"
+	TLSCertPathEnvKey = "SPYRE_HEALTH_TLS_CERT_PATH"
+	TLSKeyPathEnvKey  = "SPYRE_HEALTH_TLS_KEY_PATH"
+	TLSCAPathEnvKey   = "SPYRE_HEALTH_TLS_CA_PATH"
+
 	DefaultTLSCertPath = "/etc/device-plugin/certs/tls.crt"
 	DefaultTLSKeyPath  = "/etc/device-plugin/certs/tls.key"
+	DefaultTLSCAPath   = "/etc/device-plugin/certs/ca.crt"
 
 	// Reconnection configuration
 	DefaultMaxReconnectAttempts = 10
@@ -71,6 +75,11 @@ func loadTLSCredentials() (credentials.TransportCredentials, error) {
 		keyPath = DefaultTLSKeyPath
 	}
 
+	caPath := os.Getenv(TLSCAPathEnvKey)
+	if caPath == "" {
+		caPath = DefaultTLSCAPath
+	}
+
 	glog.Infof("Loading TLS credentials")
 
 	clientCert, err := tls.LoadX509KeyPair(certPath, keyPath)
@@ -78,10 +87,20 @@ func loadTLSCredentials() (credentials.TransportCredentials, error) {
 		return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
 	}
 
+	caCert, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate from %s", caPath)
+	}
+
 	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{clientCert},
-		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: true,
+		Certificates: []tls.Certificate{clientCert},
+		RootCAs:      certPool,
+		ServerName:   "spyre-components",
+		MinVersion:   tls.VersionTLS12,
 	}
 
 	glog.Info("TLS credentials loaded successfully for spyre health client")
@@ -145,7 +164,10 @@ func (t *SpyreHealthClient) SetBackoffMultiplier(multiplier float64) {
 
 func (t *SpyreHealthClient) Start(ctx context.Context, updateChan chan struct{}, initialDevices *pb.Devices) error {
 	if err := t.Register(ctx, updateChan, initialDevices); err != nil {
-		return fmt.Errorf("failed to register: %w", err)
+		// TLS credentials or socket may not be ready yet (e.g. cert-manager secret not yet mounted).
+		// Retry in the background so handler.Start() succeeds and processUpdate keeps running.
+		glog.Warningf("Initial registration failed, retrying in background: %v", err)
+		go t.attemptReconnect(ctx, updateChan, initialDevices)
 	}
 	return nil
 }
@@ -172,6 +194,8 @@ func (t *SpyreHealthClient) Register(ctx context.Context, updateChan chan struct
 
 	creds, err := loadTLSCredentials() // pragma: allowlist secret
 	if err != nil {
+		// TLS credentials may not be available yet (e.g. cert-manager secret not yet mounted).
+		// Return the error so attemptReconnect's retry loop keeps trying until the cert appears.
 		return fmt.Errorf("failed to load TLS credentials: %w", err) // pragma: allowlist secret
 	}
 	glog.Info("Using TLS for spyre health client connection")
