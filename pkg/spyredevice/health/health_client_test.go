@@ -78,14 +78,29 @@ func loadServerTLSCredentials() (credentials.TransportCredentials, error) {
 		return nil, fmt.Errorf("TLS key path not set")
 	}
 
+	caPath := os.Getenv(TLSCAPathEnvKey)
+	if caPath == "" {
+		return nil, fmt.Errorf("TLS CA path not set")
+	}
+
 	serverCert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load server certificate and key: %w", err)
 	}
 
+	caCert, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
-		ClientAuth:   tls.NoClientCert, // pragma: allowlist secret
+		ClientAuth:   tls.RequireAndVerifyClientCert, // pragma: allowlist secret
+		ClientCAs:    certPool,
 		MinVersion:   tls.VersionTLS12,
 	}
 
@@ -193,14 +208,14 @@ func createDummyTLSCertificates() error {
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
 			Organization: []string{"Test"},
-			CommonName:   "localhost",
+			CommonName:   "spyre-components",
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(1 * time.Hour),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
-		DNSNames:              []string{"localhost"},
+		DNSNames:              []string{"spyre-components"},
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
@@ -237,6 +252,8 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 	BeforeAll(func() {
 		_ = os.Setenv(TLSCertPathEnvKey, "/tmp/certs/tls.crt")
 		_ = os.Setenv(TLSKeyPathEnvKey, "/tmp/certs/tls.key")
+		// The self-signed cert is its own CA for test purposes
+		_ = os.Setenv(TLSCAPathEnvKey, "/tmp/certs/tls.crt")
 
 		if err := createDummyTLSCertificates(); err != nil {
 			Skip(fmt.Sprintf("Cannot create TLS certificates for testing: %v", err))
@@ -247,6 +264,7 @@ var _ = Describe("SpyreHealthClient", Serial, Ordered, func() {
 		cleanupDummyTLSCertificates()
 		_ = os.Unsetenv(TLSCertPathEnvKey)
 		_ = os.Unsetenv(TLSKeyPathEnvKey)
+		_ = os.Unsetenv(TLSCAPathEnvKey)
 	})
 
 	DescribeTable("MapsEqual", func(a, b map[string]any, expected bool) {
