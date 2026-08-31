@@ -13,6 +13,7 @@ import (
 
 	"github.com/ibm-aiu/spyre-device-plugin/pkg/resources"
 	. "github.com/ibm-aiu/spyre-device-plugin/pkg/resources/server"
+	spyreconf "github.com/ibm-aiu/spyre-device-plugin/pkg/spyredevice/config"
 	"github.com/ibm-aiu/spyre-device-plugin/pkg/types"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
@@ -213,6 +214,39 @@ var _ = Describe("Resource Server", func() {
 			Expect(envs).To(HaveKey("PCIDEVICE_IBM_COM_AIU_PF"))
 			// Metrics path key "SPYRE_METRIC_PATH" may or may not be present
 			// depending on whether config.IsMetricsEnabled() returns true
+		})
+
+		It("should inject SPYRE_METRIC_PATH and AIUPTI_ENABLE_METRICS when metrics template has enable=true", func() {
+			// Switch senlib template to the "enable" fixture (METRICS.general.enable=true)
+			// and re-initialise the package-level config so IsMetricsEnabled() returns true.
+			enableTemplatePath := "../../../test/data/senlib_config/enable"
+			defaultTemplatePath := "../../../test/data/senlib_config"
+
+			_ = os.Setenv(spyreconf.TemplatePathKey, enableTemplatePath)
+			// Point host paths to local test dirs so InitConfigMount doesn't try
+			// to create directories under /usr/local/etc/device-plugins.
+			_ = os.Setenv(spyreconf.MetricsHostPathKey, "metrics-host-path")
+			_ = os.Setenv(spyreconf.HostPathKey, "config-host-path")
+			_, err := spyreconf.InitConfigMount()
+			Expect(err).To(BeNil())
+			defer func() {
+				// Restore the default template so other tests are unaffected.
+				_ = os.Setenv(spyreconf.TemplatePathKey, defaultTemplatePath)
+				_, _ = spyreconf.InitConfigMount()
+			}()
+
+			deviceIDs := []string{"0000:01:00.0"}
+			mockPool := &MockResourcePool{
+				Envs: []string{"0000:01:00.0"},
+			}
+			allocatedCh := make(chan types.AllocationInfo, 1)
+			rs = NewResourceServer("spyre_pf", "sock", true, mockPool, nil, allocatedCh, "")
+
+			envs := rs.(*ResourceServer).GetEnvs(deviceIDs)
+
+			Expect(envs).To(HaveKey("SPYRE_METRIC_PATH"))
+			Expect(envs["SPYRE_METRIC_PATH"]).NotTo(BeEmpty())
+			Expect(envs).To(HaveKeyWithValue("AIUPTI_ENABLE_METRICS", "true"))
 		})
 	})
 })
