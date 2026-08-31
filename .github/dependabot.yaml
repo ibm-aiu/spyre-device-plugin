@@ -19,6 +19,8 @@ updates:
     versions: ["*"]
   - dependency-name: "github.com/onsi/ginkgo/v2"
     versions: ["*"]
+  - dependency-name: "github.com/ibm-aiu/*"
+    versions: ["*"]
 - package-ecosystem: docker
   directory: /images
   schedule:
