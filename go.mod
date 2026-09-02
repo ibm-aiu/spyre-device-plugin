@@ -1,6 +1,6 @@
 module github.com/ibm-aiu/spyre-device-plugin
 
-go 1.26.4
+go 1.26.7
 
 require (
 	github.com/golang/glog v1.2.5
