@@ -4,4 +4,5 @@ formatter:
   retain_line_breaks: true
   max_line_length: 80
 exclude:
+  - .github/**
   - config/crd/external/**
