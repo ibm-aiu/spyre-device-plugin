@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -474,6 +475,10 @@ var _ = Describe("Pod Watcher", func() {
 					expected map[string]spyrev1alpha1.Reservation,
 				) {
 					nodeState := &spyrev1alpha1.SpyreNodeState{Status: spyrev1alpha1.SpyreNodeStateStatus{Reservations: orig}}
+					// The caller normalizes before reconciling, so that a reservation
+					// left behind by an older scheduler is matched by Pod like any
+					// other rather than only by its device set.
+					nodeState.Status.NormalizeReservations()
 					r := ReconcileReservation(nodeState, pod, allocatedDeviceIDs)
 					Expect(r).Should(Equal(expected))
 				}, Entry("remove one of reservations (order insensitive)",
@@ -487,6 +492,9 @@ var _ = Describe("Pod Watcher", func() {
 							DeviceSets: [][]string{{"d2", "d1"}, {"d3", "d4"}}}},
 					map[string]spyrev1alpha1.Reservation{
 						"spyre_pf": {
+							Entries: []spyrev1alpha1.ReservationEntry{
+								{Pod: spyrev1alpha1.Pod{Name: "p2", Namespace: "ns1"},
+									DeviceList: []string{"d3", "d4"}}},
 							PodsUnderScheduling: []spyrev1alpha1.Pod{
 								{Name: "p2", Namespace: "ns1"}},
 							DeviceSets: [][]string{{"d3", "d4"}}}}),
@@ -499,7 +507,51 @@ var _ = Describe("Pod Watcher", func() {
 								{Name: "p2", Namespace: "ns1"}},
 							DeviceSets: [][]string{{"d3", "d4"}}}},
 					map[string]spyrev1alpha1.Reservation{},
-				))
+				),
+				// The reason the Pod-bound model exists: with every reservation the
+				// same size, nothing but the owner distinguishes them, and retiring
+				// the wrong one hands a device that is still reserved to a second Pod.
+				Entry("retires the entry the Pod owns, not another of the same size",
+					[]string{"d1"},
+					&spyrev1alpha1.Pod{Name: "p1", Namespace: "ns1", UID: "uid-1"},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": reservationOf(
+							reservedFor("p1", "uid-1", "d1"),
+							reservedFor("p2", "uid-2", "d2"))},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": reservationOf(reservedFor("p2", "uid-2", "d2"))}),
+				// A successor that reuses its predecessor's name is a different
+				// allocation. Allocating for it must not retire the reservation the
+				// predecessor is still holding.
+				Entry("keeps a same-named predecessor's reservation",
+					[]string{"d2"},
+					&spyrev1alpha1.Pod{Name: "p1", Namespace: "ns1", UID: "uid-new"},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": reservationOf(
+							reservedFor("p1", "uid-old", "d1"),
+							reservedFor("p1", "uid-new", "d2"))},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": reservationOf(reservedFor("p1", "uid-old", "d1"))}),
+				// The compatibility shim adopts a device set that no Pod claims. Its
+				// owner is unrecoverable, so the devices are all there is to go by.
+				Entry("falls back to the device set for a reservation with no owner",
+					[]string{"d1"},
+					&spyrev1alpha1.Pod{Name: "p9", Namespace: "ns1", UID: "uid-9"},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": {DeviceSets: [][]string{{"d1"}}}},
+					map[string]spyrev1alpha1.Reservation{},
+				),
+				// Only one pool's reservation is retired; the Pod's other pools and
+				// other Pods' pools are left as they were.
+				Entry("leaves the pools the allocation does not touch alone",
+					[]string{"d1"},
+					&spyrev1alpha1.Pod{Name: "p1", Namespace: "ns1", UID: "uid-1"},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf":       reservationOf(reservedFor("p1", "uid-1", "d1")),
+						"spyre_pf_tier0": reservationOf(reservedFor("p2", "uid-2", "d2"))},
+					map[string]spyrev1alpha1.Reservation{
+						"spyre_pf_tier0": reservationOf(reservedFor("p2", "uid-2", "d2"))}),
+			)
 
 			It("must error out on getting allocation of non-existing Pod", func() {
 				p := corev1.Pod{
@@ -525,3 +577,19 @@ var _ = Describe("Pod Watcher", func() {
 		})
 
 })
+
+// reservedFor is the reservation the scheduler records for Pod name/uid in ns1.
+func reservedFor(name, uid string, devices ...string) spyrev1alpha1.ReservationEntry {
+	return spyrev1alpha1.ReservationEntry{
+		Pod:        spyrev1alpha1.Pod{Name: name, Namespace: "ns1", UID: k8stypes.UID(uid)},
+		DeviceList: devices,
+	}
+}
+
+// reservationOf builds a reservation the way an up-to-date writer persists it:
+// Entries as the source of truth, with the deprecated fields derived from them.
+func reservationOf(entries ...spyrev1alpha1.ReservationEntry) spyrev1alpha1.Reservation {
+	r := spyrev1alpha1.Reservation{Entries: entries}
+	r.SyncLegacy()
+	return r
+}
