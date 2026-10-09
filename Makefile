@@ -68,16 +68,20 @@ PIP                         ?= pip3
 # detect-secrets
 DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=detect-secrets"
 
-# Shamelessly copied from: https://github.com/opendatahub-io/opendatahub-operator/blob/a08c94a226585e43387ad263e2653c0fd43130f1/Makefile#L132C1-L139C1
-define go-mod-version
-$(shell go mod graph | grep $(1) 2>/dev/null | head -n 1 | cut -d'@' -f 2)
+# Where a module's source actually is. Unlike composing a module cache path by
+# hand, this honours a `replace` directive, so generating CRDs from a locally
+# checked out dependency produces the schema the tests are written against
+# instead of the released one. -mod=mod is required because this repo vendors:
+# in vendor mode `go list -m` reports no directory at all.
+define module-dir
+$(shell go list -mod=mod -m -f '{{.Dir}}' $(1) 2>/dev/null)
 endef
 
 # Using controller-gen to fetch external CRDs and put them in config/crd/external folder
 # They're used in tests, as they have to be created for controller to work
 define fetch-external-crds
 GOFLAGS="-mod=readonly" $(CONTROLLER_GEN) crd \
-paths=$(shell go env GOPATH)/pkg/mod/$(1)@$(call go-mod-version,$(1))/$(2)/... \
+paths=$(call module-dir,$(1))/$(2)/... \
 output:crd:artifacts:config=config/crd/external
 endef
 
