@@ -427,13 +427,13 @@ var _ = Describe("Test Topology", func() {
 			Entry("valid 3rd tier0", spyreconst.TierZeroResourceNameSuffix, thirdTier0Group, nil),
 			Entry("valid 4th tier0", spyreconst.TierZeroResourceNameSuffix, fourthTier0Group, nil),
 			Entry("invalid tier0", spyreconst.TierZeroResourceNameSuffix,
-				append(firstTier0Group, secondTier0Group[0]), pcitopov2.OutOfExpectedTierErr),
+				append(firstTier0Group, secondTier0Group[0]), pcitopov2.ErrOutOfExpectedTier),
 			Entry("invalid deviceID", spyreconst.TierZeroResourceNameSuffix,
-				append([]string{"invalidDevice"}, firstTier0Group...), pcitopov2.DeviceNotFoundErr),
+				append([]string{"invalidDevice"}, firstTier0Group...), pcitopov2.ErrDeviceNotFound),
 			Entry("valid 1st tier1", spyreconst.TierOneResourceNameSuffix, firstTier1Group, nil),
 			Entry("valid 2nd tier1", spyreconst.TierOneResourceNameSuffix, secondTier1Group, nil),
 			Entry("invalid tier1", spyreconst.TierOneResourceNameSuffix,
-				append(firstTier1Group, secondTier1Group[0]), pcitopov2.OutOfExpectedTierErr),
+				append(firstTier1Group, secondTier1Group[0]), pcitopov2.ErrOutOfExpectedTier),
 			Entry("valid tier2", spyreconst.TierTwoResourceNameSuffix, allDevices, nil),
 		)
 

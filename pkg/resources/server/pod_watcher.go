@@ -10,8 +10,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -273,10 +271,7 @@ func (w *PodWatcher) NotifyInitialAllocationList() {
 				if len(allocatedDeviceIDs) > 0 {
 					resourceName := utils.GetResourceNameFromPod(&p)
 					allocation := spyrev1alpha1.Allocation{
-						Pod: &spyrev1alpha1.Pod{
-							Name:      p.Name,
-							Namespace: p.Namespace,
-						},
+						Pod:          podReference(&p),
 						DeviceList:   allocatedDeviceIDs,
 						ResourcePool: resourceName,
 					}
@@ -395,7 +390,7 @@ func (w *PodWatcher) getAllocation(ctx context.Context,
 		return nil, -1, nil, err
 	}
 	for index, allocation := range nodeState.Status.AllocationList {
-		if allocation.Pod.Name == p.Name && allocation.Pod.Namespace == p.Namespace {
+		if allocation.Pod != nil && allocation.Pod.SameAs(*podReference(&p)) {
 			return nodeState, index, &allocation, nil
 		}
 	}
@@ -433,28 +428,30 @@ func (w *PodWatcher) allocate(
 	var err error
 	var nodeState *spyrev1alpha1.SpyreNodeState
 
+	podRef := podReference(&p)
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if nodeState, err = spyredevice.GetNodeStateForThisNode(ctx, w.spyreClient); err != nil {
 			return err
 		}
+		// Bring Reservation.Entries up to date with whatever the last writer left
+		// behind, so the reconciliation below can go by Pod rather than by size.
+		nodeState.Status.NormalizeReservations()
 		for _, allocation := range nodeState.Status.AllocationList {
-			// skip if the item has already added
-			if allocation.Pod.Name == p.Name && allocation.Pod.Namespace == p.Namespace {
+			// skip if the item has already added.
+			// The generation has to match: a successor Pod that reuses the name of
+			// one still being torn down is a different allocation, not this one.
+			if allocation.Pod != nil && allocation.Pod.SameAs(*podRef) {
 				return nil
 			}
 		}
 		// add new item if not exist
 		newAllocation := spyrev1alpha1.Allocation{
-			Pod: &spyrev1alpha1.Pod{
-				Name:      p.Name,
-				Namespace: p.Namespace,
-			},
+			Pod:          podRef,
 			DeviceList:   allocatedDeviceIDs,
 			ResourcePool: resourceName,
 		}
 		nodeState.Status.AllocationList = append(nodeState.Status.AllocationList, newAllocation)
-		nodeState.Status.Reservations = reconcileReservation(nodeState,
-			&spyrev1alpha1.Pod{Name: p.Name, Namespace: p.Namespace}, allocatedDeviceIDs)
+		nodeState.Status.Reservations = reconcileReservation(nodeState, podRef, allocatedDeviceIDs)
 		glog.Infof("reservation to allocation in allocate (len diff): AllocationList: %v, Reservations: %v",
 			nodeState.Status.AllocationList, nodeState.Status.Reservations)
 		_, err = w.spyreClient.UpdateStatus(ctx, nodeState, false)
@@ -532,6 +529,25 @@ func getPodKey(pod corev1.Pod) string {
 	return fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 }
 
+// podReference records which generation of a Pod an allocation or a reservation
+// belongs to. The UID is what makes that unambiguous: a runner set recreates Pods
+// under the same name every few seconds, so name and namespace alone cannot tell
+// a successor apart from the predecessor it replaced.
+func podReference(p *corev1.Pod) *spyrev1alpha1.Pod {
+	return &spyrev1alpha1.Pod{Name: p.Name, Namespace: p.Namespace, UID: p.UID}
+}
+
+// reconcileReservation retires the reservation that has just become an allocation.
+//
+// The Pod is the authority: once its devices are allocated, the entry recorded for
+// that exact Pod generation has served its purpose. Only when no entry names the
+// Pod - a reservation written by a scheduler that predates the Pod-bound model, or
+// one whose owner the compatibility shim could not recover - does it fall back to
+// the device set, which the allocation is definitely made of.
+//
+// The previous version removed by name and by device set independently, and did so
+// with a swap-remove while ranging over the very slice it was shortening, which
+// skipped elements and could leave the two lists disagreeing about who held what.
 func reconcileReservation(
 	nodeState *spyrev1alpha1.SpyreNodeState,
 	pod *spyrev1alpha1.Pod,
@@ -539,30 +555,15 @@ func reconcileReservation(
 ) map[string]spyrev1alpha1.Reservation {
 
 	newReservations := make(map[string]spyrev1alpha1.Reservation)
-	sAllocDevs := make([]string, len(allocatedDeviceIDs))
-	copy(sAllocDevs, allocatedDeviceIDs)
-	sort.Strings(sAllocDevs)
-
 	for resName, reservation := range nodeState.Status.Reservations {
-		for idx, p := range reservation.PodsUnderScheduling {
-			if p.Name == pod.Name && p.Namespace == pod.Namespace {
-				// remove
-				reservation.PodsUnderScheduling[idx] = reservation.PodsUnderScheduling[len(reservation.PodsUnderScheduling)-1]
-				reservation.PodsUnderScheduling = reservation.PodsUnderScheduling[:len(reservation.PodsUnderScheduling)-1]
-			}
+		// Work on a copy: the removals rewrite the entry slice in place, and the
+		// caller still holds the original map.
+		r := *reservation.DeepCopy()
+		if !r.RemoveByPod(*pod) {
+			r.RemoveByDevices(allocatedDeviceIDs)
 		}
-		for idx, devs := range reservation.DeviceSets {
-			sDevs := make([]string, len(devs))
-			copy(sDevs, devs)
-			sort.Strings(sDevs)
-			if reflect.DeepEqual(sAllocDevs, sDevs) {
-				// remove
-				reservation.DeviceSets[idx] = reservation.DeviceSets[len(reservation.DeviceSets)-1]
-				reservation.DeviceSets = reservation.DeviceSets[:len(reservation.DeviceSets)-1]
-			}
-		}
-		if len(reservation.PodsUnderScheduling) > 0 || len(reservation.DeviceSets) > 0 {
-			newReservations[resName] = reservation
+		if !r.IsEmpty() {
+			newReservations[resName] = r
 		}
 	}
 	return newReservations

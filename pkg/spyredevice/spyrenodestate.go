@@ -449,38 +449,29 @@ func allocateReservedDevices(ctx context.Context, spyreClient *spyreclient.Spyre
 	}
 
 	glog.V(1).Infof("Checking reservation")
+	nodeState.Status.NormalizeReservations()
 	r, exists := nodeState.Status.Reservations[resourceName]
 	if !exists {
 		err = fmt.Errorf("unable to find reservation for resource: %s", resourceName)
 		return nil, err
 	}
 
-	// select deviceSet
-	var devSet []string
-	for _, devSet = range r.DeviceSets {
-		// with this condition, do not allow subset selection
-		if len(devSet) == int(nDev) {
-			unavailableFound := false
-			// check availability of reserved devices
-			for _, i := range devSet {
-				if !slices.Contains(availableDeviceIDs, i) {
-					unavailableFound = true
-					break
-				}
-			}
-			if !unavailableFound {
-				break
-			}
-		}
-	}
-
-	if len(devSet) != int(nDev) {
+	// Pick any reservation of exactly nDev devices, all of them still available.
+	// This is the one place that matches a reservation without knowing the Pod,
+	// because kubelet does not tell GetPreferredAllocation which Pod it is
+	// allocating for - see the comment on EntryForSize. Any two reservations of
+	// the same size are interchangeable here: each waiting Pod asked for that many
+	// devices, so either set serves either Pod. What was unsafe was guessing by
+	// size where the Pod *is* known, which is what the scheduler used to do when
+	// deciding whose reservation to release.
+	entry, found := r.EntryForSize(int(nDev), availableDeviceIDs)
+	if !found {
 		err = fmt.Errorf("unable to find device set for %d resources for: %s (reserved: %v)",
-			int(nDev), resourceName, r.DeviceSets)
+			int(nDev), resourceName, r.Entries)
 		return nil, err
 	}
 
-	return devSet, err
+	return entry.DeviceList, nil
 }
 
 func allocateFromDeviceMap(availableDeviceIDs []string, nDev int32, deviceMap map[string]*pluginapi.Device) []string {

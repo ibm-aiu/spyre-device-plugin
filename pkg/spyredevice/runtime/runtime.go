@@ -202,9 +202,12 @@ func GetAllocationList(clientset *kubernetes.Clientset) ([]spyrev1alpha1.Allocat
 			resourceName := utils.GetResourceNameFromPod(&p)
 			if len(allocatedDeviceIDs) > 0 {
 				allocation := spyrev1alpha1.Allocation{
+					// The UID pins the allocation to this generation of the Pod, so a
+					// successor that reuses the name is not mistaken for it.
 					Pod: &spyrev1alpha1.Pod{
 						Name:      p.Name,
 						Namespace: p.Namespace,
+						UID:       p.UID,
 					},
 					DeviceList:   allocatedDeviceIDs,
 					ResourcePool: resourceName,

@@ -484,28 +484,32 @@ var _ = Describe("Spyre State Updater", func() {
 				Expect(err).To(BeNil())
 				Expect(nodeState.Name).Should(Equal("testnodestate"))
 
+				p1 := spyrev1alpha1.Pod{Namespace: "n1", Name: "p1", UID: "uid-1"}
+				p2 := spyrev1alpha1.Pod{Namespace: "n1", Name: "p2", UID: "uid-2"}
+
 				// add first one
-				nodeState.Status.Reservations = map[string]spyrev1alpha1.Reservation{
-					"spyre_pf": {DeviceSets: [][]string{{"0000:99:00.0"}}},
-				}
+				nodeState.Status.ReserveDevices("spyre_pf", p1, []string{"0000:99:00.0"}, metav1.Now())
 				_, err = spyreClient.UpdateStatus(ctx, nodeState, false)
 				Expect(err).To(BeNil())
 				nodeState, err = spyreClient.Get(ctx, "testnodestate")
 				Expect(err).To(BeNil())
-				ds := nodeState.Status.Reservations["spyre_pf"].DeviceSets
-				Expect(ds[0]).Should(Equal([]string{"0000:99:00.0"}))
+				entries := nodeState.Status.Reservations["spyre_pf"].Entries
+				Expect(entries).Should(HaveLen(1))
+				Expect(entries[0].Pod).Should(Equal(p1))
+				Expect(entries[0].DeviceList).Should(Equal([]string{"0000:99:00.0"}))
 
 				// add second one
-				r := nodeState.Status.Reservations["spyre_pf"]
-				r.DeviceSets = append(r.DeviceSets, []string{"0000:0a:00.0"})
-				nodeState.Status.Reservations["spyre_pf"] = r
+				nodeState.Status.ReserveDevices("spyre_pf", p2, []string{"0000:0a:00.0"}, metav1.Now())
 				_, err = spyreClient.UpdateStatus(ctx, nodeState, false)
 				Expect(err).To(BeNil())
 				nodeState, err = spyreClient.Get(ctx, "testnodestate")
 				Expect(err).To(BeNil())
-				ds = nodeState.Status.Reservations["spyre_pf"].DeviceSets
-				Expect(ds[0]).Should(Equal([]string{"0000:99:00.0"}))
-				Expect(ds[1]).Should(Equal([]string{"0000:0a:00.0"}))
+				entries = nodeState.Status.Reservations["spyre_pf"].Entries
+				Expect(entries).Should(HaveLen(2))
+				Expect(entries[0].Pod).Should(Equal(p1))
+				Expect(entries[0].DeviceList).Should(Equal([]string{"0000:99:00.0"}))
+				Expect(entries[1].Pod).Should(Equal(p2))
+				Expect(entries[1].DeviceList).Should(Equal([]string{"0000:0a:00.0"}))
 			})
 
 			It("can update the reservation status for two resources", func() {
@@ -523,27 +527,34 @@ var _ = Describe("Spyre State Updater", func() {
 				Expect(err).To(BeNil())
 				Expect(nodeState.Name).Should(Equal("testnodestate"))
 
+				p1 := spyrev1alpha1.Pod{Namespace: "n1", Name: "p1", UID: "uid-1"}
+				p2 := spyrev1alpha1.Pod{Namespace: "n1", Name: "p2", UID: "uid-2"}
+
 				// add first one
-				nodeState.Status.Reservations = map[string]spyrev1alpha1.Reservation{
-					"spyre_pf": {DeviceSets: [][]string{{"0000:99:00.0"}}},
-				}
+				nodeState.Status.ReserveDevices("spyre_pf", p1, []string{"0000:99:00.0"}, metav1.Now())
 				_, err = spyreClient.UpdateStatus(ctx, nodeState, false)
 				Expect(err).To(BeNil())
 				nodeState, err = spyreClient.Get(ctx, "testnodestate")
 				Expect(err).To(BeNil())
-				ds := nodeState.Status.Reservations["spyre_pf"].DeviceSets
-				Expect(ds[0]).Should(Equal([]string{"0000:99:00.0"}))
+				entries := nodeState.Status.Reservations["spyre_pf"].Entries
+				Expect(entries).Should(HaveLen(1))
+				Expect(entries[0].Pod).Should(Equal(p1))
+				Expect(entries[0].DeviceList).Should(Equal([]string{"0000:99:00.0"}))
 
 				// add second one
-				nodeState.Status.Reservations["spyre_pf_nearest"] = spyrev1alpha1.Reservation{DeviceSets: [][]string{{"00:aa"}}}
+				nodeState.Status.ReserveDevices("spyre_pf_nearest", p2, []string{"00:aa"}, metav1.Now())
 				_, err = spyreClient.UpdateStatus(ctx, nodeState, false)
 				Expect(err).To(BeNil())
 				nodeState, err = spyreClient.Get(ctx, "testnodestate")
 				Expect(err).To(BeNil())
-				ds = nodeState.Status.Reservations["spyre_pf"].DeviceSets
-				Expect(ds[0]).Should(Equal([]string{"0000:99:00.0"}))
-				ds = nodeState.Status.Reservations["spyre_pf_nearest"].DeviceSets
-				Expect(ds[0]).Should(Equal([]string{"00:aa"}))
+				entries = nodeState.Status.Reservations["spyre_pf"].Entries
+				Expect(entries).Should(HaveLen(1))
+				Expect(entries[0].Pod).Should(Equal(p1))
+				Expect(entries[0].DeviceList).Should(Equal([]string{"0000:99:00.0"}))
+				entries = nodeState.Status.Reservations["spyre_pf_nearest"].Entries
+				Expect(entries).Should(HaveLen(1))
+				Expect(entries[0].Pod).Should(Equal(p2))
+				Expect(entries[0].DeviceList).Should(Equal([]string{"00:aa"}))
 				By("deleting testnodestate")
 				err = spyreClient.Delete(ctx, "testnodestate", &client.DeleteOptions{})
 				Expect(err).To(BeNil())
@@ -952,6 +963,36 @@ var _ = Describe("Spyre State Updater", func() {
 							DeviceSets:          [][]string{{"00", "01"}},
 						},
 					}}, "spyre_pf_tier0", []string{"00", "01"}, int32(2), []string{"00", "01"}, ""),
+			// The scheduler now records who each set belongs to. Allocation still goes
+			// by size, because kubelet does not say which Pod it is allocating for.
+			Entry("a Pod-bound entry will be allocated",
+				&spyrev1alpha1.SpyreNodeStateStatus{
+					Reservations: map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": {
+							Entries: []spyrev1alpha1.ReservationEntry{
+								{Pod: spyrev1alpha1.Pod{Namespace: "n1", Name: "p1", UID: "uid-1"},
+									DeviceList: []string{"00", "01"}},
+							},
+							PodsUnderScheduling: []spyrev1alpha1.Pod{{Namespace: "n1", Name: "p1", UID: "uid-1"}},
+							DeviceSets:          [][]string{{"00", "01"}},
+						},
+					}}, "spyre_pf", []string{"00", "01"}, int32(2), []string{"00", "01"}, ""),
+			Entry("an entry whose devices are no longer available is skipped",
+				&spyrev1alpha1.SpyreNodeStateStatus{
+					Reservations: map[string]spyrev1alpha1.Reservation{
+						"spyre_pf": {
+							Entries: []spyrev1alpha1.ReservationEntry{
+								{Pod: spyrev1alpha1.Pod{Namespace: "n1", Name: "p1", UID: "uid-1"},
+									DeviceList: []string{"04", "05"}},
+								{Pod: spyrev1alpha1.Pod{Namespace: "n1", Name: "p2", UID: "uid-2"},
+									DeviceList: []string{"02", "03"}},
+							},
+							PodsUnderScheduling: []spyrev1alpha1.Pod{
+								{Namespace: "n1", Name: "p1", UID: "uid-1"},
+								{Namespace: "n1", Name: "p2", UID: "uid-2"}},
+							DeviceSets: [][]string{{"04", "05"}, {"02", "03"}},
+						},
+					}}, "spyre_pf", []string{"02", "03"}, int32(2), []string{"02", "03"}, ""),
 		)
 	})
 })
