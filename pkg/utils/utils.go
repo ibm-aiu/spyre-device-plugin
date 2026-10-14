@@ -297,7 +297,7 @@ func CreateNewConfigFolder(spyreConfigPath string) (string, error) {
 func CreateNewMetricsFolder(metricsHostPath, configHostPath string) (string, error) {
 	uuidValue := GetUuidFromPath(configHostPath)
 	newFolder := filepath.Join(metricsHostPath, uuidValue)
-	err := CreateFolderIfNotExists(newFolder)
+	err := CreateWritableFolderIfNotExists(newFolder)
 	return newFolder, err
 }
 
@@ -312,6 +312,13 @@ func GetUuidFromPath(hostConfigPath string) string {
 func CreateFolderIfNotExists(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return os.MkdirAll(path, os.ModeDir|0755)
+	}
+	return nil
+}
+
+func CreateWritableFolderIfNotExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return os.MkdirAll(path, os.ModeDir|0775)
 	}
 	return nil
 }
