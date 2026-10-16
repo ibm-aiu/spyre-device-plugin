@@ -311,7 +311,11 @@ func GetUuidFromPath(hostConfigPath string) string {
 
 func CreateFolderIfNotExists(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return os.MkdirAll(path, os.ModeDir|0755)
+		// Use 0777 so workload pods running as arbitrary UIDs (e.g. uid=1000910000
+		// on OpenShift with SCC) can write metric files into directories created by
+		// the device plugin (uid=1001). The workload UID is not predictable and will
+		// differ from the device plugin UID, so world-writable is required.
+		return os.MkdirAll(path, os.ModeDir|0777)
 	}
 	return nil
 }
