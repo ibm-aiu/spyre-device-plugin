@@ -115,6 +115,185 @@ var _ = Describe("Pod Watcher", func() {
 			Entry("specific pool with other resources", []string{"cpu", "ibm.com/spyre_pf_0000_01"}, "spyre_pf_0000_01"),
 			Entry("topology-aware pool with other resources", []string{"cpu", "ibm.com/spyre_pf_tier0"}, "spyre_pf_tier0"),
 		)
+
+		DescribeTable("AllSpyreContainersStarted",
+			func(
+				containers []corev1.Container,
+				initContainers []corev1.Container,
+				containerStatuses []corev1.ContainerStatus,
+				initContainerStatuses []corev1.ContainerStatus,
+				expected bool,
+			) {
+				pod := &corev1.Pod{
+					Spec: corev1.PodSpec{
+						Containers:     containers,
+						InitContainers: initContainers,
+					},
+					Status: corev1.PodStatus{
+						ContainerStatuses:     containerStatuses,
+						InitContainerStatuses: initContainerStatuses,
+					},
+				}
+				started := AllSpyreContainersStarted(pod)
+				Expect(started).To(Equal(expected))
+			},
+			Entry("single spyre container started",
+				[]corev1.Container{
+					{
+						Name: "app",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "app", ContainerID: "crio://app-123"},
+				},
+				nil,
+				true,
+			),
+			Entry("single spyre container not started yet (empty container ID)",
+				[]corev1.Container{
+					{
+						Name: "app",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "app", ContainerID: ""},
+				},
+				nil,
+				false,
+			),
+			Entry("multi-container: sidecar started, spyre container pending",
+				[]corev1.Container{
+					{
+						Name: "sidecar",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+						},
+					},
+					{
+						Name: "spyre-worker",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "sidecar", ContainerID: "crio://sidecar-123"},
+					{Name: "spyre-worker", ContainerID: ""},
+				},
+				nil,
+				false,
+			),
+			Entry("multi-container: sidecar started and spyre container started",
+				[]corev1.Container{
+					{
+						Name: "sidecar",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+						},
+					},
+					{
+						Name: "spyre-worker",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "sidecar", ContainerID: "crio://sidecar-123"},
+					{Name: "spyre-worker", ContainerID: "crio://worker-123"},
+				},
+				nil,
+				true,
+			),
+			Entry("multi spyre containers: only one started",
+				[]corev1.Container{
+					{
+						Name: "spyre-c1",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+					{
+						Name: "spyre-c2",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_vf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "spyre-c1", ContainerID: "crio://c1-123"},
+					{Name: "spyre-c2", ContainerID: ""},
+				},
+				nil,
+				false,
+			),
+			Entry("multi spyre containers: both started",
+				[]corev1.Container{
+					{
+						Name: "spyre-c1",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+					{
+						Name: "spyre-c2",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_vf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "spyre-c1", ContainerID: "crio://c1-123"},
+					{Name: "spyre-c2", ContainerID: "crio://c2-123"},
+				},
+				nil,
+				true,
+			),
+			Entry("spyre in init container: started",
+				nil,
+				[]corev1.Container{
+					{
+						Name: "init-spyre",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"ibm.com/spyre_pf": resource.MustParse("1")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "init-spyre", ContainerID: "crio://init-123"},
+				},
+				true,
+			),
+			Entry("pod with no spyre containers",
+				[]corev1.Container{
+					{
+						Name: "plain-app",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+						},
+					},
+				},
+				nil,
+				[]corev1.ContainerStatus{
+					{Name: "plain-app", ContainerID: "crio://app-123"},
+				},
+				nil,
+				false,
+			),
+		)
 	})
 
 	Context("watcher process",
@@ -304,6 +483,7 @@ var _ = Describe("Pod Watcher", func() {
 				// must have no container status before
 				Expect(len(p.Status.ContainerStatuses)).To(Equal(0))
 				p.Status.ContainerStatuses = append(p.Status.ContainerStatuses, corev1.ContainerStatus{
+					Name:        testName,
 					ContainerID: containerId,
 				})
 				p.Status.Phase = phase
@@ -466,6 +646,69 @@ var _ = Describe("Pod Watcher", func() {
 					&failedPhase),
 				Entry("multiple devices", "multi-spyre", [][]string{NodeDeviceIds}, corev1.PodRunning, nil),
 			)
+
+			It("handles multi-container pod where first container has no mounts", func() {
+				testName := "multi-container-pod"
+				createPodProcess(testName, "1")
+				testHostPath, containerConfigHostPath, containerMetricsHostPath, containerId :=
+					allocateProcess(testName, []string{NodeDeviceIds[0]})
+				defer func(path string) { _ = os.RemoveAll(path) }(testHostPath)
+
+				p, err := K8sClientset.CoreV1().Pods(namespace).Get(context.Background(), testName, metav1.GetOptions{})
+				Expect(err).To(BeNil())
+				// container 0 has no ID / not ready
+				p.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name:        "sidecar",
+						ContainerID: "",
+					},
+					{
+						Name:        testName,
+						ContainerID: containerId,
+					},
+				}
+				p.Status.Phase = corev1.PodRunning
+				_, err = K8sClientset.CoreV1().Pods(namespace).UpdateStatus(context.Background(), p, metav1.UpdateOptions{})
+				Expect(err).To(BeNil())
+
+				allocatedDeviceIDs, mntHostPaths, _ := spyrert.GetDevicesAndMounts(p)
+				Expect(allocatedDeviceIDs).To(Equal([]string{NodeDeviceIds[0]}))
+				Expect(containerConfigHostPath).To(BeElementOf(mntHostPaths))
+				Expect(containerMetricsHostPath).To(BeElementOf(mntHostPaths))
+
+				deletePodProcess(testName, containerId, nil)
+				checkDeviceReleased(containerConfigHostPath, containerMetricsHostPath, []string{NodeDeviceIds[0]})
+			})
+
+			It("stops requeuing and ignores deleted unmemoized pod", func() {
+				testName := "deleted-unmemoized-pod"
+				createPodProcess(testName, "1")
+				p, err := K8sClientset.CoreV1().Pods(namespace).Get(context.Background(), testName, metav1.GetOptions{})
+				Expect(err).To(BeNil())
+				p.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name:        testName,
+						ContainerID: "dummy-unmounted-container-id",
+					},
+				}
+				p.Status.Phase = corev1.PodPending
+				_, err = K8sClientset.CoreV1().Pods(namespace).UpdateStatus(context.Background(), p, metav1.UpdateOptions{})
+				Expect(err).To(BeNil())
+
+				// Delete pod immediately before mounts exist
+				gracePeriod := int64(0)
+				err = K8sClientset.CoreV1().Pods(namespace).Delete(
+					context.Background(),
+					testName,
+					metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+				Expect(err).To(BeNil())
+
+				Eventually(func(g Gomega) {
+					_, err := K8sClientset.CoreV1().Pods(namespace).Get(context.Background(), testName, metav1.GetOptions{})
+					g.Expect(err).NotTo(BeNil())
+					g.Expect(errors.IsNotFound(err)).To(BeTrue())
+				}).WithTimeout(10 * time.Second).WithPolling(1 * time.Second).Should(Succeed())
+			})
 
 			DescribeTable("RemoveReservation",
 				func(

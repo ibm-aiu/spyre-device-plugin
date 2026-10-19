@@ -120,13 +120,11 @@ func (w *PodWatcher) Start() {
 				p, ok := obj.(*corev1.Pod)
 				if ok && spyrepod.IsSpyrePod(p) && p.Status.Phase == corev1.PodRunning {
 					glog.V(1).Infof("add: %s/%s", p.Namespace, p.Name)
-					_, _, mntHostPaths := w.getAndUpdateAllocationMemoIfNotExist(p)
 					event := &SpyrePodEvent{
 						EventType: AddOrUpdateEvent,
 						Pod:       *p,
 					}
 					w.eventQueue.Add(event)
-					w.mountedCh <- mntHostPaths
 				}
 			},
 			UpdateFunc: func(obj, newObj interface{}) {
@@ -137,20 +135,16 @@ func (w *PodWatcher) Start() {
 				prev := obj.(*corev1.Pod)
 				switch {
 				case p.Status.Phase == corev1.PodRunning ||
-					(p.Status.Phase == corev1.PodPending && len(p.Status.ContainerStatuses) > 0):
+					(p.Status.Phase == corev1.PodPending && allSpyreContainersStarted(p)):
 					if _, exist := w.getPodMemo(*p); exist {
 						return
 					}
-					added, _, mntHostPaths := w.getAndUpdateAllocationMemoIfNotExist(p)
-					if added {
-						glog.V(1).Infof("update: %s/%s", p.Namespace, p.Name)
-						event := &SpyrePodEvent{
-							EventType: AddOrUpdateEvent,
-							Pod:       *p,
-						}
-						w.eventQueue.Add(event)
-						w.mountedCh <- mntHostPaths
+					glog.V(1).Infof("update: %s/%s", p.Namespace, p.Name)
+					event := &SpyrePodEvent{
+						EventType: AddOrUpdateEvent,
+						Pod:       *p,
 					}
+					w.eventQueue.Add(event)
 				case p.Status.Phase == corev1.PodSucceeded && prev.Status.Phase != corev1.PodSucceeded:
 					glog.V(1).Infof("release on complete: %s/%s", p.Namespace, p.Name)
 					event := &SpyrePodEvent{
@@ -332,54 +326,76 @@ func (w *PodWatcher) deallocateAndRequeueIfFailed(ctx context.Context, event *Sp
 // if the update succeeds, remove pod entry from the memo.
 // if the pod entry is not available in the memo, skip
 func (w *PodWatcher) deallocate(ctx context.Context, p corev1.Pod) error {
-	podKey := getPodKey(p)
-	memo, found := w.getPodMemo(p)
-	if !found {
-		glog.Infof("pod %s is not available in the memo, ignore", podKey)
-		return nil
+	memo, foundMemo := w.getPodMemo(p)
+	if foundMemo {
+		w.cleanMountPathsAndNotify(&memo)
+		glog.Infof("successfully deallocate %v by container ID", memo.allocatedDeviceIDs)
+	} else {
+		glog.Infof("pod %s is not available in the memo, ignore", getPodKey(p))
 	}
-	deallocatedDeviceIDs := memo.allocatedDeviceIDs
-	mntHostPaths := memo.mntHostPaths
-	if len(mntHostPaths) > 0 {
-		// remove mount path
-		for _, mntHostPath := range mntHostPaths {
-			if err := os.RemoveAll(mntHostPath); err != nil {
-				glog.Errorf("failed to remove %s", mntHostPath)
-			} else {
-				glog.Infof("successfully remove unmount of %s", mntHostPath)
-				// clean mount path to skip repetition if SpyreNodeState update failed
-				memo.mntHostPaths = []string{}
-			}
-		}
-		if !utils.IsReservationMode() {
-			w.deallocatedCh <- types.DeallocationInfo{
-				DeviceIDs:    deallocatedDeviceIDs,
-				ResourceName: memo.resourceName,
-			}
-		}
 
-	}
-	glog.Infof("successfully deallocate %v by container ID", deallocatedDeviceIDs)
+	w.unsetP2PDMAPermissions(ctx, p)
 
-	_, _, allocation, err := w.getAllocation(ctx, p)
-	if err == nil {
-		if dma.NeedP2PDMAConfigure(allocation.DeviceList) {
-			if errs := dma.UnsetDevResourceFilePermissions(allocation.DeviceList); len(errs) > 0 {
-				glog.Warningf("some device resource file may not be unset: %v", errs)
-			}
-		}
-	}
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		nodeState, index, _, err := w.getAllocation(ctx, p)
-		if err != nil {
-			return err
-		}
-		return w.removeAllocation(ctx, nodeState, index)
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return w.removeAllocationOrReservation(ctx, p)
 	})
-	if err == nil {
+	if foundMemo && err == nil {
 		w.deleteMemo(p)
 	}
 	return err
+}
+
+// cleanMountPathsAndNotify removes host-mounted paths of the memo
+// and sends the deallocation info to deallocatedCh (not in reservation mode).
+func (w *PodWatcher) cleanMountPathsAndNotify(memo *AllocationMemo) {
+	if len(memo.mntHostPaths) == 0 {
+		return
+	}
+	for _, mntHostPath := range memo.mntHostPaths {
+		if err := os.RemoveAll(mntHostPath); err != nil {
+			glog.Errorf("failed to remove %s", mntHostPath)
+			continue
+		}
+		glog.Infof("successfully remove unmount of %s", mntHostPath)
+		// clean mount path to skip repetition if SpyreNodeState update failed
+		memo.mntHostPaths = []string{}
+	}
+	if !utils.IsReservationMode() {
+		w.deallocatedCh <- types.DeallocationInfo{
+			DeviceIDs:    memo.allocatedDeviceIDs,
+			ResourceName: memo.resourceName,
+		}
+	}
+}
+
+// unsetP2PDMAPermissions unsets device resource file permissions if the pod has an allocation requiring P2P DMA.
+func (w *PodWatcher) unsetP2PDMAPermissions(ctx context.Context, p corev1.Pod) {
+	_, _, allocation, err := w.getAllocation(ctx, p)
+	if err != nil || !dma.NeedP2PDMAConfigure(allocation.DeviceList) {
+		return
+	}
+	if errs := dma.UnsetDevResourceFilePermissions(allocation.DeviceList); len(errs) > 0 {
+		glog.Warningf("some device resource file may not be unset: %v", errs)
+	}
+}
+
+// removeAllocationOrReservation removes the pod allocation from SpyreNodeState.
+// If the pod is not in AllocationList, in reservation mode, any pending reservation is cleaned up.
+func (w *PodWatcher) removeAllocationOrReservation(ctx context.Context, p corev1.Pod) error {
+	nodeState, index, _, err := w.getAllocation(ctx, p)
+	if err == nil {
+		return w.removeAllocation(ctx, nodeState, index)
+	}
+	if !utils.IsReservationMode() {
+		return nil
+	}
+	nodeState, getErr := spyredevice.GetNodeStateForThisNode(ctx, w.spyreClient)
+	if getErr != nil {
+		return nil
+	}
+	nodeState.Status.Reservations = reconcileReservation(nodeState, podReference(&p), nil)
+	_, updateErr := w.spyreClient.UpdateStatus(ctx, nodeState, false)
+	return updateErr
 }
 
 func (w *PodWatcher) getAllocation(ctx context.Context,
@@ -409,10 +425,27 @@ func (w *PodWatcher) removeAllocation(ctx context.Context, nodeState *spyrev1alp
 // ignore if the memo entry has been deleted in the case that DELETE event processed before.
 func (w *PodWatcher) allocateAndRequeueIfFailed(ctx context.Context, event *SpyrePodEvent) {
 	p := event.Pod
+	latestPod, alive := w.isPodAlive(ctx, &p)
+	if !alive {
+		glog.Infof("pod %s/%s is not alive or deleted, stop requeue for %s event", p.Namespace, p.Name, event.EventType)
+		return
+	}
+	p = *latestPod
+
 	memo, found := w.getPodMemo(p)
 	if !found {
-		glog.Infof("%s/%s has been deleted, ignore %s event", p.Namespace, p.Name, event.EventType)
-		return
+		added, _, mntHostPaths := w.getAndUpdateAllocationMemoIfNotExist(&p)
+		if !added {
+			glog.V(1).Infof("devices not yet ready for %s/%s, requeue at %d attempt",
+				p.Namespace, p.Name, event.Attempt)
+			w.requeue(event)
+			return
+		}
+		w.mountedCh <- mntHostPaths
+		memo, found = w.getPodMemo(p)
+		if !found {
+			return
+		}
 	}
 	err := w.allocate(ctx, p, memo.allocatedDeviceIDs, memo.resourceName)
 	if err != nil {
@@ -420,6 +453,34 @@ func (w *PodWatcher) allocateAndRequeueIfFailed(ctx context.Context, event *Spyr
 			p.Namespace, p.Name, err, event.Attempt)
 		w.requeue(event)
 	}
+}
+
+// isPodAlive returns true and the latest Pod object if the pod still exists, is not marked for deletion,
+// and has not reached a terminal phase.
+func (w *PodWatcher) isPodAlive(ctx context.Context, p *corev1.Pod) (*corev1.Pod, bool) {
+	if p.DeletionTimestamp != nil {
+		return nil, false
+	}
+	if p.Status.Phase == corev1.PodFailed || p.Status.Phase == corev1.PodSucceeded {
+		return nil, false
+	}
+	if w.Clientset == nil {
+		return p, true
+	}
+	latestPod, err := w.Clientset.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, false
+	}
+	if latestPod.UID != p.UID {
+		return nil, false
+	}
+	if latestPod.DeletionTimestamp != nil {
+		return nil, false
+	}
+	if latestPod.Status.Phase == corev1.PodFailed || latestPod.Status.Phase == corev1.PodSucceeded {
+		return nil, false
+	}
+	return latestPod, true
 }
 
 // allocate updates allocatedDeviceIDs in SpyreNodeState if not exists.
@@ -483,7 +544,7 @@ func (w *PodWatcher) getAndUpdateAllocationMemoIfNotExist(p *corev1.Pod) (bool, 
 		return false, allocatedDeviceIDs, mntHostPaths
 	}
 	if len(allocatedDeviceIDs) == 0 {
-		glog.Infof("unexpected allocatedDeviceIDs length zero on pod %s/%s, skip AddAllocationToMemo", p.Namespace, p.Name)
+		glog.V(1).Infof("unexpected allocatedDeviceIDs length zero on pod %s/%s, requeue", p.Namespace, p.Name)
 		return false, allocatedDeviceIDs, mntHostPaths
 	}
 	resourceName := utils.GetResourceNameFromPod(p)
@@ -495,6 +556,8 @@ func (w *PodWatcher) getAndUpdateAllocationMemoIfNotExist(p *corev1.Pod) (bool, 
 	}
 	if err = spyreconf.WritePodInfo(mntHostPaths, *p); err != nil {
 		glog.Warningf("failed to write pod info %s/%s for exporting metrics: %v", p.Namespace, p.Name, err)
+	} else {
+		glog.Infof("successfully added %s: %s/%s", key, p.Namespace, p.Name)
 	}
 	return true, allocatedDeviceIDs, mntHostPaths
 }
@@ -515,6 +578,62 @@ func (w *PodWatcher) deleteMemo(p corev1.Pod) {
 	defer w.memoLock.Unlock()
 	key := getPodKey(p)
 	delete(w.memo, key)
+}
+
+func isSpyreContainer(c corev1.Container) bool {
+	for res := range c.Resources.Requests {
+		if strings.Contains(res.String(), utils.ResourceNamePrefix) {
+			return true
+		}
+	}
+	for res := range c.Resources.Limits {
+		if strings.Contains(res.String(), utils.ResourceNamePrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// allSpyreContainersStarted returns true if every container requesting Spyre devices has started.
+func allSpyreContainersStarted(p *corev1.Pod) bool {
+	spyreContainers := make(map[string]bool)
+	for _, containers := range [][]corev1.Container{p.Spec.Containers, p.Spec.InitContainers} {
+		for _, c := range containers {
+			if isSpyreContainer(c) {
+				spyreContainers[c.Name] = false
+			}
+		}
+	}
+	if len(spyreContainers) == 0 {
+		return false
+	}
+
+	markStartedContainers(spyreContainers, p.Status.ContainerStatuses)
+	markStartedContainers(spyreContainers, p.Status.InitContainerStatuses)
+
+	for _, started := range spyreContainers {
+		if !started {
+			return false
+		}
+	}
+	return true
+}
+
+// markStartedContainers sets true to the entries of spyreContainers whose status shows the container has started.
+// A status without a name marks all entries.
+func markStartedContainers(spyreContainers map[string]bool, statuses []corev1.ContainerStatus) {
+	for _, cs := range statuses {
+		if cs.ContainerID == "" && cs.State.Running == nil {
+			continue
+		}
+		if cs.Name == "" {
+			for name := range spyreContainers {
+				spyreContainers[name] = true
+			}
+		} else if _, exists := spyreContainers[cs.Name]; exists {
+			spyreContainers[cs.Name] = true
+		}
+	}
 }
 
 // isPodAllocateFailed returns true if pod is failed with error message Allocate failed.

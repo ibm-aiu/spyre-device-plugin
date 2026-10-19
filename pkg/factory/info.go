@@ -73,17 +73,8 @@ func (info *SpyreDeviceSharedInfo) Run() {
 			close(info.stop)
 			return
 		case allocatedInfo, ok := <-info.allocatedCh:
-			if ok && len(allocatedInfo.DeviceIDs) > 0 {
-				if len(allocatedInfo.MountPoints) > 0 && utils.MountPathExists(allocatedInfo.MountPoints) {
-					sort.Strings(allocatedInfo.MountPoints)
-					info.updateAllocation(allocatedInfo)
-					info.cleanupMu.Lock()
-					now := time.Now()
-					for _, mntPoint := range allocatedInfo.MountPoints {
-						info.reservedPathWithTime[mntPoint] = now
-					}
-					info.cleanupMu.Unlock()
-				}
+			if ok {
+				info.handleAllocated(allocatedInfo)
 			}
 		case deallocatedInfo, ok := <-info.deallocatedCh:
 			if ok && len(deallocatedInfo.DeviceIDs) > 0 {
@@ -91,18 +82,38 @@ func (info *SpyreDeviceSharedInfo) Run() {
 			}
 		case mntHostPaths, ok := <-info.mountedCh:
 			if ok {
-				// claim reserved host paths
-				info.cleanupMu.Lock()
-				for _, mntPoint := range mntHostPaths {
-					_, ok := info.reservedPathWithTime[mntPoint]
-					if !ok {
-						glog.Warningf("%s is not in the reserved path. It seems to deallocate devices before container created or device plugin has been restarted after the creation.", mntPoint) //nolint:lll
-					}
-					delete(info.reservedPathWithTime, mntPoint)
-				}
-				info.cleanupMu.Unlock()
+				info.claimMountedPaths(mntHostPaths)
 			}
 		}
+	}
+}
+
+// handleAllocated updates allocation and reserves mount points of the allocated info.
+func (info *SpyreDeviceSharedInfo) handleAllocated(allocatedInfo types.AllocationInfo) {
+	if len(allocatedInfo.DeviceIDs) == 0 || len(allocatedInfo.MountPoints) == 0 ||
+		!utils.MountPathExists(allocatedInfo.MountPoints) {
+		return
+	}
+	sort.Strings(allocatedInfo.MountPoints)
+	info.updateAllocation(allocatedInfo)
+	info.cleanupMu.Lock()
+	defer info.cleanupMu.Unlock()
+	now := time.Now()
+	for _, mntPoint := range allocatedInfo.MountPoints {
+		info.reservedPathWithTime[mntPoint] = now
+	}
+}
+
+// claimMountedPaths claims reserved host paths.
+func (info *SpyreDeviceSharedInfo) claimMountedPaths(mntHostPaths []string) {
+	info.cleanupMu.Lock()
+	defer info.cleanupMu.Unlock()
+	for _, mntPoint := range mntHostPaths {
+		_, reserved := info.reservedPathWithTime[mntPoint]
+		if !reserved && !utils.IsReservationMode() {
+			glog.Warningf("%s is not in the reserved path. It seems to deallocate devices before container created or device plugin has been restarted after the creation.", mntPoint) //nolint:lll
+		}
+		delete(info.reservedPathWithTime, mntPoint)
 	}
 }
 
