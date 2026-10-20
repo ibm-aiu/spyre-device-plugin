@@ -249,7 +249,6 @@ func GetDevicesAndMounts(p *corev1.Pod) ([]string, []string, error) {
 			mntHostPaths = append(mntHostPaths, containerMntHostInfo.ConfigHostPath)
 			mntHostPaths = append(mntHostPaths, containerMntHostInfo.MetricsHostPth)
 		}
-		return allDeviceIDs, mntHostPaths, err
 	}
 	return allDeviceIDs, mntHostPaths, err
 }

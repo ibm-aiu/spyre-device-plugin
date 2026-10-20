@@ -14,6 +14,7 @@ import (
 )
 
 var ReconcileReservation = reconcileReservation
+var AllSpyreContainersStarted = allSpyreContainersStarted
 
 func (w *PodWatcher) GetAllocation(
 	ctx context.Context, p corev1.Pod) (
