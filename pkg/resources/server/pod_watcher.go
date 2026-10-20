@@ -116,81 +116,80 @@ func (w *PodWatcher) Start() {
 		ResyncPeriod:  time.Second * 0,
 		Indexers:      cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		Handler: cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				p, ok := obj.(*corev1.Pod)
-				if ok && spyrepod.IsSpyrePod(p) && p.Status.Phase == corev1.PodRunning {
-					glog.V(1).Infof("add: %s/%s", p.Namespace, p.Name)
-					event := &SpyrePodEvent{
-						EventType: AddOrUpdateEvent,
-						Pod:       *p,
-					}
-					w.eventQueue.Add(event)
-				}
-			},
-			UpdateFunc: func(obj, newObj interface{}) {
-				p, ok := newObj.(*corev1.Pod)
-				if !ok || !spyrepod.IsSpyrePod(p) {
-					return
-				}
-				prev := obj.(*corev1.Pod)
-				switch {
-				case p.Status.Phase == corev1.PodRunning ||
-					(p.Status.Phase == corev1.PodPending && allSpyreContainersStarted(p)):
-					if _, exist := w.getPodMemo(*p); exist {
-						return
-					}
-					glog.V(1).Infof("update: %s/%s", p.Namespace, p.Name)
-					event := &SpyrePodEvent{
-						EventType: AddOrUpdateEvent,
-						Pod:       *p,
-					}
-					w.eventQueue.Add(event)
-				case p.Status.Phase == corev1.PodSucceeded && prev.Status.Phase != corev1.PodSucceeded:
-					glog.V(1).Infof("release on complete: %s/%s", p.Namespace, p.Name)
-					event := &SpyrePodEvent{
-						EventType: DeleteEvent,
-						Pod:       *p,
-					}
-					w.eventQueue.Add(event)
-				case p.Spec.RestartPolicy == corev1.RestartPolicyNever && p.Status.Phase == corev1.PodFailed &&
-					prev.Status.Phase != corev1.PodFailed:
-					glog.V(1).Infof("release on error: %s/%s", p.Namespace, p.Name)
-					event := &SpyrePodEvent{
-						EventType: DeleteEvent,
-						Pod:       *p,
-					}
-					w.eventQueue.Add(event)
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				p, ok := obj.(*corev1.Pod)
-				if ok && spyrepod.IsSpyrePod(p) {
-					glog.V(1).Infof("delete: %s/%s", p.Namespace, p.Name)
-					event := &SpyrePodEvent{
-						EventType: DeleteEvent,
-						Pod:       *p,
-					}
-					w.eventQueue.Add(event)
-				}
-			},
+			AddFunc:    w.onPodAdd,
+			UpdateFunc: w.onPodUpdate,
+			DeleteFunc: w.onPodDelete,
 		},
 	}
 	_, informer := cache.NewInformerWithOptions(informerOptions)
 
-	if spyreconf.IsConfigHostPathExist() && spyreconf.IsSomeContainerMounted() {
-		if unmountedDevices, err := spyrert.CleanUnmountedHostPath(); err == nil && len(unmountedDevices) > 0 {
-			glog.V(1).Infof("deallocate initial unmounted devices: %v", unmountedDevices)
-			if !utils.IsReservationMode() {
-				for resourceName, deviceIDs := range unmountedDevices {
-					w.deallocatedCh <- types.DeallocationInfo{
-						DeviceIDs:    deviceIDs,
-						ResourceName: resourceName,
-					}
-				}
-			}
+	w.cleanInitialUnmountedDevices()
+	w.StartProcessEventQueue(informer)
+}
+
+// enqueueEvent logs the message and adds the event of the pod to the event queue.
+func (w *PodWatcher) enqueueEvent(eventType EventType, p *corev1.Pod, logPrefix string) {
+	glog.V(1).Infof("%s: %s/%s", logPrefix, p.Namespace, p.Name)
+	w.eventQueue.Add(&SpyrePodEvent{
+		EventType: eventType,
+		Pod:       *p,
+	})
+}
+
+func (w *PodWatcher) onPodAdd(obj interface{}) {
+	p, ok := obj.(*corev1.Pod)
+	if ok && spyrepod.IsSpyrePod(p) && p.Status.Phase == corev1.PodRunning {
+		w.enqueueEvent(AddOrUpdateEvent, p, "add")
+	}
+}
+
+func (w *PodWatcher) onPodUpdate(obj, newObj interface{}) {
+	p, ok := newObj.(*corev1.Pod)
+	if !ok || !spyrepod.IsSpyrePod(p) {
+		return
+	}
+	prev := obj.(*corev1.Pod)
+	switch {
+	case p.Status.Phase == corev1.PodRunning ||
+		(p.Status.Phase == corev1.PodPending && allSpyreContainersStarted(p)):
+		if _, exist := w.getPodMemo(*p); !exist {
+			w.enqueueEvent(AddOrUpdateEvent, p, "update")
+		}
+	case p.Status.Phase == corev1.PodSucceeded && prev.Status.Phase != corev1.PodSucceeded:
+		w.enqueueEvent(DeleteEvent, p, "release on complete")
+	case p.Spec.RestartPolicy == corev1.RestartPolicyNever && p.Status.Phase == corev1.PodFailed &&
+		prev.Status.Phase != corev1.PodFailed:
+		w.enqueueEvent(DeleteEvent, p, "release on error")
+	}
+}
+
+func (w *PodWatcher) onPodDelete(obj interface{}) {
+	p, ok := obj.(*corev1.Pod)
+	if ok && spyrepod.IsSpyrePod(p) {
+		w.enqueueEvent(DeleteEvent, p, "delete")
+	}
+}
+
+// cleanInitialUnmountedDevices cleans unmounted host paths left from before start
+// and notifies the deallocation of their devices (not in reservation mode).
+func (w *PodWatcher) cleanInitialUnmountedDevices() {
+	if !spyreconf.IsConfigHostPathExist() || !spyreconf.IsSomeContainerMounted() {
+		return
+	}
+	unmountedDevices, err := spyrert.CleanUnmountedHostPath()
+	if err != nil || len(unmountedDevices) == 0 {
+		return
+	}
+	glog.V(1).Infof("deallocate initial unmounted devices: %v", unmountedDevices)
+	if utils.IsReservationMode() {
+		return
+	}
+	for resourceName, deviceIDs := range unmountedDevices {
+		w.deallocatedCh <- types.DeallocationInfo{
+			DeviceIDs:    deviceIDs,
+			ResourceName: resourceName,
 		}
 	}
-	w.StartProcessEventQueue(informer)
 }
 
 // Run begins watching and syncing.
