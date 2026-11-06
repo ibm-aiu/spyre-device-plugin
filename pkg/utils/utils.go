@@ -357,23 +357,15 @@ func GetNodeName() string {
 	return nodeName
 }
 
-// RemoveIndex removes item at specific index if valid. Otherwise return original slice
+// RemoveAllocationIndex removes item at specific index if valid. Otherwise return original slice.
+// The input slice is never modified: the result is a newly allocated slice.
 func RemoveAllocationIndex(a []spyrev1alpha1.Allocation, index int) []spyrev1alpha1.Allocation {
-	if index < len(a) {
-		if index == 0 {
-			if len(a) == 1 {
-				return []spyrev1alpha1.Allocation{}
-			} else {
-				return a[1:]
-			}
-		}
-		if index == len(a)-1 {
-			return a[0:index]
-		} else {
-			return append(a[0:index], a[index+1:]...)
-		}
+	if index < 0 || index >= len(a) {
+		return a
 	}
-	return a
+	result := make([]spyrev1alpha1.Allocation, 0, len(a)-1)
+	result = append(result, a[:index]...)
+	return append(result, a[index+1:]...)
 }
 
 func MountPathExists(paths []string) bool {

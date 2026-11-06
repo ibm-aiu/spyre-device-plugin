@@ -78,6 +78,18 @@ var _ = Describe("Pod Watcher", func() {
 					{Pod: &spyrev1alpha1.Pod{Name: "pod1"}},
 					{Pod: &spyrev1alpha1.Pod{Name: "pod2"}}}),
 		)
+		It("RemoveAllocationIndex does not modify the original list", func() {
+			originalList := []spyrev1alpha1.Allocation{
+				{Pod: &spyrev1alpha1.Pod{Name: "pod1"}},
+				{Pod: &spyrev1alpha1.Pod{Name: "pod2"}},
+				{Pod: &spyrev1alpha1.Pod{Name: "pod3"}}}
+			removedList := utils.RemoveAllocationIndex(originalList, 1)
+			Expect(removedList).To(HaveLen(2))
+			Expect(originalList).To(HaveLen(3))
+			Expect(originalList[0].Pod.Name).To(Equal("pod1"))
+			Expect(originalList[1].Pod.Name).To(Equal("pod2"))
+			Expect(originalList[2].Pod.Name).To(Equal("pod3"))
+		})
 
 		DescribeTable("GetResourceNameFromPod",
 			func(resourceNames []string, expectedResourceName string) {
